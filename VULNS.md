@@ -7,19 +7,19 @@
 
 **Status legend:** 🔴 pending (not yet introduced) · 🟠 live on `main` (documented + exploit test) · 🟢 fixed on `fix/<slug>` (PR open, fixed test passing)
 
-> **Phase status:** Phase 1 (scaffold) complete. The vulnerabilities below are
-> introduced in **Phase 3**, row by row, each with an exploit test in
-> `server/tests/exploits/`. **0 of 24 are live yet.** This is expected and correct
-> — `main` is the *secure baseline* until Phase 3.
+> **Phase status:** Phase 3 in progress (Batch 1 = the injection + broken-auth
+> cluster). **1 of 24 live:** #1 SQLi (UNION). Each live vuln has a passing
+> exploit test in `server/tests/exploits/`. The rest are still the secure Phase 2
+> baseline.
 
 ## Matrix
 
 | # | Vuln class | Lives in | Fix branch | Status |
 |---|-----------|----------|------------|--------|
-| 1 | SQLi – UNION/data | `GET /api/search?q=` | `fix/sqli` | 🔴 pending |
-| 2 | SQLi – auth bypass | `POST /api/login` | `fix/sqli-login` | 🔴 pending |
+| 1 | SQLi – UNION/data | `GET /api/search?q=` | `fix/sqli` | 🟠 live on `main` |
+| 2 | SQLi – auth bypass | `POST /api/auth/login` | `fix/sqli-login` | 🔴 pending |
 | 3 | Blind SQLi (boolean/time) | `GET /api/products?sort=` | `fix/blind-sqli` | 🔴 pending |
-| 4 | Broken auth | login / register | `fix/auth` | 🔴 pending |
+| 4 | Broken auth | login / register / seed | `fix/auth` | 🔴 pending |
 | 5 | Broken access control (IDOR) | `GET /api/orders/:id`, `/messages/:id` | `fix/idor` | 🔴 pending |
 | 6 | Privilege escalation | `/api/admin/*` | `fix/authz-admin` | 🔴 pending |
 | 7 | Mass assignment | `POST /api/register`, `PATCH /api/me` | `fix/mass-assignment` | 🔴 pending |
@@ -59,12 +59,34 @@ the placeholders below reserve the slot and record the plan.
 - **Exploit test:** `server/tests/exploits/<name>.test.ts`
 -->
 
-### 1. SQLi – UNION/data — 🔴 pending
-_Introduced in Phase 3 at `GET /api/search?q=` via `$queryRawUnsafe`._
+### 1. SQLi – UNION/data — 🟠 live on `main`
+- **Where:** `server/src/services/searchService.ts` → `GET /api/search?q=`
+- **Vulnerable code:**
+  ```ts
+  const sql = `SELECT id, name, description, category FROM "Product"
+               WHERE name ILIKE '%${q}%' OR description ILIKE '%${q}%' ...`;
+  return prisma.$queryRawUnsafe(sql);
+  ```
+- **Exploit (copy-paste):**
+  ```
+  GET /api/search?q=' UNION SELECT id, email, "passwordHash", role::text FROM "User"-- 
+  ```
+  (URL-encode the value.) User `email` comes back in the `name` field and
+  `passwordHash` in `description`.
+- **Impact:** Full read of any table — here it dumps every customer's email and
+  (because of #4) plaintext password. Total account takeover, incl. admin.
+- **Fix (`fix/sqli`):** use a parameterized query — `prisma.$queryRaw\`... ILIKE ${'%'+q+'%'}\`` or Prisma's `findMany` with `contains`. Never concatenate input into SQL.
+- **Detect:** grep for `$queryRawUnsafe` / string-built SQL; WAF sees `UNION SELECT`; DB logs show a `UNION` against `"User"` from the search path.
+- **Exploit test:** `server/tests/exploits/01-sqli-search.test.ts`
 
 ### 2. SQLi – auth bypass — 🔴 pending
+_Batch 1 (next commit) — raw concatenated login query in `authService.login`._
+
 ### 3. Blind SQLi (boolean/time) — 🔴 pending
+_Batch 2 — `GET /api/products?sort=` raw ORDER BY._
+
 ### 4. Broken auth — 🔴 pending
+_Batch 1 (next commit) — plaintext password storage in seed + register/reset._
 ### 5. Broken access control (IDOR) — 🔴 pending
 ### 6. Privilege escalation — 🔴 pending
 ### 7. Mass assignment — 🔴 pending

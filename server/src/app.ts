@@ -19,6 +19,7 @@ import { messagesRouter } from "./routes/messages.js";
 import { ordersRouter } from "./routes/orders.js";
 import { pagesRouter } from "./routes/pages.js";
 import { productsRouter } from "./routes/products.js";
+import { searchRouter } from "./routes/search.js";
 import { sellerRouter } from "./routes/seller.js";
 
 export function createApp() {
@@ -76,6 +77,7 @@ export function createApp() {
   app.use("/api/auth", authRouter);
   app.use("/api/me", meRouter);
   app.use("/api/products", productsRouter);
+  app.use("/api/search", searchRouter);
   app.use("/api/messages", messagesRouter);
   app.use("/api/orders", ordersRouter);
   app.use("/api/seller", sellerRouter);

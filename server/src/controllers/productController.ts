@@ -2,9 +2,13 @@ import type { NextFunction, Request, Response } from "express";
 import { productService } from "../services/productService.js";
 
 export const productController = {
-  async list(_req: Request, res: Response, next: NextFunction) {
+  // GET /api/products?q=&category=&sort=  — secure, parameterized search.
+  async list(req: Request, res: Response, next: NextFunction) {
     try {
-      res.json({ products: await productService.list() });
+      const q = typeof req.query.q === "string" ? req.query.q : undefined;
+      const category = typeof req.query.category === "string" ? req.query.category : undefined;
+      const sort = typeof req.query.sort === "string" ? req.query.sort : undefined;
+      res.json({ products: await productService.search({ q, category, sort }) });
     } catch (err) {
       next(err);
     }

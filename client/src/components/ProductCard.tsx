@@ -1,26 +1,35 @@
+import { Link } from "react-router-dom";
 import type { Product } from "../api/client";
+import { useCart } from "../context/CartContext";
+import { useToast } from "./Toaster";
+import { money } from "../lib/format";
 
-const money = (n: number) =>
-  new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(n);
+export function ProductCard({ product, onAdded }: { product: Product; onAdded?: () => void }) {
+  const { add } = useCart();
+  const toast = useToast();
 
-export function ProductCard({ product, onAdd }: { product: Product; onAdd: (p: Product) => void }) {
+  const quickAdd = (e: React.MouseEvent) => {
+    e.preventDefault();
+    add(product);
+    toast(`Added “${product.name}” to cart`);
+    onAdded?.();
+  };
+
   return (
     <article className="card">
-      <div className="card-media">
+      <Link to={`/product/${product.id}`} className="card-media" aria-label={product.name}>
         {product.imageUrl && (
           <img src={product.imageUrl} alt={product.name} loading="lazy" width={400} height={400} />
         )}
-        <button
-          className="quick-add"
-          onClick={() => onAdd(product)}
-          aria-label={`Add ${product.name} to cart`}
-        >
+        <button className="quick-add" onClick={quickAdd} aria-label={`Add ${product.name} to cart`}>
           Quick add
         </button>
-      </div>
+      </Link>
       <div className="card-body">
         <span className="card-cat">{product.category}</span>
-        <h3 className="card-name">{product.name}</h3>
+        <Link to={`/product/${product.id}`}>
+          <h3 className="card-name">{product.name}</h3>
+        </Link>
         <div className="card-foot">
           <span className="card-price tnum">{money(product.price)}</span>
           <span className="seller-badge">

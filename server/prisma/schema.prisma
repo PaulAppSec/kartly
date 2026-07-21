@@ -108,3 +108,12 @@ model Address {
   city    String
   country String
 }
+
+// Seller-editable store announcement. On the secure baseline this is rendered
+// as escaped DATA; the SSTI lesson (#16) compiles it as a template in Phase 3.
+model Announcement {
+  id        String   @id @default(uuid())
+  sellerId  String   @unique
+  template  String   @default("Welcome to our store!")
+  updatedAt DateTime @updatedAt
+}

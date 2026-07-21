@@ -1,5 +1,5 @@
 import type { Product } from "@prisma/client";
-import { productRepo } from "../data/productRepo.js";
+import { productRepo, type ProductQuery } from "../data/productRepo.js";
 import { HttpError } from "../middleware/errorHandler.js";
 
 // Public shape returned to the client. Explicit DTO mapping keeps internal
@@ -13,10 +13,11 @@ export interface ProductDTO {
   stock: number;
   category: string;
   imageUrl: string | null;
+  sellerId: string | null;
   createdAt: string;
 }
 
-function toDTO(p: Product): ProductDTO {
+export function toProductDTO(p: Product): ProductDTO {
   return {
     id: p.id,
     name: p.name,
@@ -25,18 +26,22 @@ function toDTO(p: Product): ProductDTO {
     stock: p.stock,
     category: p.category,
     imageUrl: p.imageUrl,
+    sellerId: p.sellerId,
     createdAt: p.createdAt.toISOString(),
   };
 }
 
 export const productService = {
+  async search(query: ProductQuery): Promise<ProductDTO[]> {
+    const products = await productRepo.search(query);
+    return products.map(toProductDTO);
+  },
   async list(): Promise<ProductDTO[]> {
-    const products = await productRepo.findAll();
-    return products.map(toDTO);
+    return (await productRepo.findAll()).map(toProductDTO);
   },
   async getById(id: string): Promise<ProductDTO> {
     const product = await productRepo.findById(id);
     if (!product) throw new HttpError(404, "Product not found.");
-    return toDTO(product);
+    return toProductDTO(product);
   },
 };

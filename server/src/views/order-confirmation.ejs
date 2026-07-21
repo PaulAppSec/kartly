@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Order confirmed · Kartly</title>
+  <%- include('partials/styles') %>
+</head>
+<body>
+  <div class="wrap" style="max-width:640px;">
+    <div class="brand"><span class="g">K</span> Kartly</div>
+    <div class="card" style="margin-top:24px; text-align:center;">
+      <div style="width:56px;height:56px;border-radius:50%;background:#E7F6ED;color:#1F9D55;display:grid;place-items:center;margin:0 auto 16px;font-size:1.6rem;">✓</div>
+      <h1>Your order is confirmed</h1>
+      <p class="muted">Order <strong><%= order.id %></strong> · <%= money(order.total) %></p>
+      <p class="muted">We've emailed your receipt. Sellers have been notified and will start packing.</p>
+      <p style="margin-top:22px;">
+        <a class="btn" href="/receipt/<%= order.id %>">View receipt</a>
+        &nbsp; <a href="/">Continue shopping</a>
+      </p>
+    </div>
+  </div>
+</body>
+</html>

@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title><%= title %> · Admin · Kartly</title>
+  <%- include('../partials/styles') %>
+</head>
+<body class="admin">
+  <div class="shell">
+    <%- include('../partials/adminnav') %>
+    <main class="main">
+      <div class="row">
+        <h1><%= title %></h1>
+        <span class="muted"><%= rows.length %> total</span>
+      </div>
+      <div class="card" style="padding:6px 20px; margin-top:16px;">
+        <table>
+          <thead>
+            <tr><% columns.forEach(function(c){ %><th><%= c %></th><% }) %></tr>
+          </thead>
+          <tbody>
+            <% rows.forEach(function(r){ %>
+              <tr><% r.forEach(function(cell){ %><td><%= cell %></td><% }) %></tr>
+            <% }) %>
+          </tbody>
+        </table>
+      </div>
+    </main>
+  </div>
+</body>
+</html>

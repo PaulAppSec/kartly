@@ -21,4 +21,14 @@ export const env = {
   databaseUrl: required("DATABASE_URL", "postgresql://kartly:kartly_dev_password@db:5432/kartly?schema=public"),
   uploadDir: process.env.UPLOAD_DIR ?? "/app/uploads",
   maxUploadBytes: Number(process.env.MAX_UPLOAD_BYTES ?? 5 * 1024 * 1024),
+
+  jwtAccessSecret: required("JWT_ACCESS_SECRET", "dev-access-secret-change-me"),
+  jwtRefreshSecret: required("JWT_REFRESH_SECRET", "dev-refresh-secret-change-me"),
+  jwtResetSecret: process.env.JWT_RESET_SECRET ?? "dev-reset-secret-change-me",
+  jwtAccessTtl: process.env.JWT_ACCESS_TTL ?? "15m",
+  jwtRefreshTtl: process.env.JWT_REFRESH_TTL ?? "7d",
+  jwtResetTtl: process.env.JWT_RESET_TTL ?? "30m",
+
+  // Where "sent" emails are written locally (nothing actually leaves the host).
+  outboxDir: process.env.OUTBOX_DIR ?? "/app/outbox",
 } as const;

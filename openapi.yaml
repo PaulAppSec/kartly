@@ -4,39 +4,148 @@ info:
   version: 2.0.0-vulnerable
   description: >
     REST API for Kartly, a deliberately-vulnerable marketplace used for AppSec
-    education. LOCAL ONLY — never deploy. Endpoints are added phase by phase;
-    Phase 1 ships health + read-only catalog.
+    education. LOCAL ONLY — never deploy. Phase 2 ships the full secure baseline:
+    auth, accounts, catalog/search, reviews, cart/checkout, orders, messages,
+    and the seller area. Cookie (httpOnly JWT) or Bearer auth; state-changing
+    cookie requests require the X-CSRF-Token header (double-submit).
 servers:
   - url: http://localhost:4000
     description: Local (docker-compose)
 tags:
   - name: system
+  - name: auth
+  - name: account
   - name: catalog
+  - name: orders
+  - name: messages
+  - name: seller
 paths:
   /api/health:
     get:
       tags: [system]
       summary: Liveness and database readiness
       responses:
-        "200":
-          description: Service healthy
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  status: { type: string, example: ok }
-                  db: { type: string, example: up }
-                  time: { type: string, format: date-time }
-        "503":
-          description: Database unavailable
+        "200": { description: Service healthy }
+        "503": { description: Database unavailable }
+
+  /api/auth/register:
+    post:
+      tags: [auth]
+      summary: Register (always creates a CUSTOMER — role is not accepted)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password, name]
+              properties:
+                email: { type: string, format: email }
+                password: { type: string, minLength: 8 }
+                name: { type: string }
+      responses:
+        "201": { description: Registered; sets auth + CSRF cookies }
+        "409": { description: Email already in use }
+  /api/auth/login:
+    post:
+      tags: [auth]
+      summary: Log in
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email: { type: string, format: email }
+                password: { type: string }
+      responses:
+        "200": { description: Logged in; sets auth + CSRF cookies }
+        "401": { description: Incorrect email or password }
+  /api/auth/refresh:
+    post:
+      tags: [auth]
+      summary: Rotate access token using the refresh cookie
+      responses:
+        "200": { description: New tokens issued }
+        "401": { description: Invalid refresh token }
+  /api/auth/logout:
+    post:
+      tags: [auth]
+      summary: Clear the session cookies
+      responses:
+        "200": { description: Logged out }
+  /api/auth/forgot-password:
+    post:
+      tags: [auth]
+      summary: Request a password-reset email (rate-limited; no enumeration)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email]
+              properties:
+                email: { type: string, format: email }
+      responses:
+        "200": { description: Always the same response whether or not the email exists }
+  /api/auth/reset-password:
+    post:
+      tags: [auth]
+      summary: Reset a password using a token from the email link
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [token, password]
+              properties:
+                token: { type: string }
+                password: { type: string, minLength: 8 }
+      responses:
+        "200": { description: Password reset }
+        "400": { description: Invalid or expired reset link }
+
+  /api/me:
+    get:
+      tags: [account]
+      summary: Current user
+      responses:
+        "200": { description: The authenticated user }
+        "401": { description: Not authenticated }
+    patch:
+      tags: [account]
+      summary: Update profile (name / bio / avatarUrl only)
+      responses:
+        "200": { description: Updated user }
+  /api/me/addresses:
+    get:
+      tags: [account]
+      summary: List my addresses
+      responses:
+        "200": { description: Addresses }
+    post:
+      tags: [account]
+      summary: Add an address
+      responses:
+        "201": { description: Created }
+
   /api/products:
     get:
       tags: [catalog]
-      summary: List catalog products
+      summary: Search / list products
+      parameters:
+        - { in: query, name: q, schema: { type: string } }
+        - { in: query, name: category, schema: { type: string } }
+        - in: query
+          name: sort
+          schema: { type: string, enum: [newest, oldest, price_asc, price_desc, name] }
       responses:
         "200":
-          description: Product list
+          description: Products
           content:
             application/json:
               schema:
@@ -48,23 +157,137 @@ paths:
   /api/products/{id}:
     get:
       tags: [catalog]
-      summary: Get a single product
+      summary: Product detail
       parameters:
-        - in: path
-          name: id
-          required: true
-          schema: { type: string }
+        - { in: path, name: id, required: true, schema: { type: string } }
       responses:
-        "200":
-          description: Product
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  product: { $ref: "#/components/schemas/Product" }
-        "404":
-          description: Not found
+        "200": { description: Product }
+        "404": { description: Not found }
+  /api/products/{id}/reviews:
+    get:
+      tags: [catalog]
+      summary: List reviews
+      parameters:
+        - { in: path, name: id, required: true, schema: { type: string } }
+      responses:
+        "200": { description: Reviews }
+    post:
+      tags: [catalog]
+      summary: Add a review (auth + CSRF)
+      parameters:
+        - { in: path, name: id, required: true, schema: { type: string } }
+      responses:
+        "201": { description: Created }
+        "401": { description: Not authenticated }
+
+  /api/orders:
+    get:
+      tags: [orders]
+      summary: List my orders
+      responses:
+        "200": { description: Orders }
+    post:
+      tags: [orders]
+      summary: Checkout (server computes price; coupon applied atomically)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [items]
+              properties:
+                items:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      productId: { type: string }
+                      qty: { type: integer, minimum: 1 }
+                couponCode: { type: string }
+      responses:
+        "201": { description: Order placed }
+        "409": { description: Out of stock }
+  /api/orders/{id}:
+    get:
+      tags: [orders]
+      summary: Get one of my orders (404 if not mine)
+      parameters:
+        - { in: path, name: id, required: true, schema: { type: string } }
+      responses:
+        "200": { description: Order }
+        "404": { description: Not found }
+
+  /api/messages:
+    get:
+      tags: [messages]
+      summary: My inbox
+      responses:
+        "200": { description: Messages }
+    post:
+      tags: [messages]
+      summary: Send a message (auth + CSRF)
+      responses:
+        "201": { description: Sent }
+  /api/messages/{id}:
+    get:
+      tags: [messages]
+      summary: Get a message I'm a party to (404 otherwise)
+      parameters:
+        - { in: path, name: id, required: true, schema: { type: string } }
+      responses:
+        "200": { description: Message }
+        "404": { description: Not found }
+
+  /api/seller/products:
+    get:
+      tags: [seller]
+      summary: My products (SELLER/ADMIN)
+      responses:
+        "200": { description: Products }
+        "403": { description: Not a seller }
+    post:
+      tags: [seller]
+      summary: Create a product (auth + CSRF)
+      responses:
+        "201": { description: Created }
+  /api/seller/products/{id}/image:
+    post:
+      tags: [seller]
+      summary: Upload a validated product image (multipart)
+      parameters:
+        - { in: path, name: id, required: true, schema: { type: string } }
+      responses:
+        "200": { description: Updated }
+        "415": { description: Unsupported image type }
+  /api/seller/products/{id}/import-url:
+    post:
+      tags: [seller]
+      summary: Import a product image from an SSRF-checked URL
+      parameters:
+        - { in: path, name: id, required: true, schema: { type: string } }
+      responses:
+        "200": { description: Updated }
+        "400": { description: Disallowed / internal URL }
+  /api/seller/products/import-xml:
+    post:
+      tags: [seller]
+      summary: Bulk import products from XXE-safe XML
+      responses:
+        "201": { description: Imported }
+        "400": { description: DTDs/entities rejected or malformed }
+  /api/seller/announcement:
+    get:
+      tags: [seller]
+      summary: Get my store announcement
+      responses:
+        "200": { description: Announcement }
+    post:
+      tags: [seller]
+      summary: Set my store announcement
+      responses:
+        "200": { description: Saved }
+
 components:
   schemas:
     Product:
@@ -77,4 +300,5 @@ components:
         stock: { type: integer }
         category: { type: string }
         imageUrl: { type: string, nullable: true }
+        sellerId: { type: string, nullable: true }
         createdAt: { type: string, format: date-time }

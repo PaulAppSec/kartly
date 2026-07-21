@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title><%= seller.name %>'s store · Kartly</title>
+  <%- include('partials/styles') %>
+</head>
+<body>
+  <div class="wrap">
+    <div class="brand"><span class="g">K</span> Kartly</div>
+    <div class="card" style="margin-top:24px; background:linear-gradient(120deg,#FFF,#FFF3EF);">
+      <span class="tag">Store</span>
+      <h1 style="margin-top:12px;"><%= seller.name %></h1>
+      <%# announcement rendered as escaped DATA (secure baseline for SSTI #16) %>
+      <p class="muted" style="font-size:1.05rem;"><%= announcement %></p>
+    </div>
+    <h3 style="margin-top:32px;">Products</h3>
+    <div class="card" style="padding:6px 20px;">
+      <table>
+        <thead><tr><th>Product</th><th>Category</th><th class="tnum">Price</th><th class="tnum">In stock</th></tr></thead>
+        <tbody>
+          <% products.forEach(function(p){ %>
+            <tr>
+              <td><a href="/share/product/<%= p.id %>"><%= p.name %></a></td>
+              <td><%= p.category %></td>
+              <td class="tnum"><%= money(p.price) %></td>
+              <td class="tnum"><%= p.stock %></td>
+            </tr>
+          <% }) %>
+          <% if (products.length === 0) { %>
+            <tr><td colspan="4" class="muted">This store has no products yet.</td></tr>
+          <% } %>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</body>
+</html>

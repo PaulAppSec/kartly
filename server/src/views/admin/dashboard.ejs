@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Admin · Kartly</title>
+  <%- include('../partials/styles') %>
+</head>
+<body class="admin">
+  <div class="shell">
+    <%- include('../partials/adminnav') %>
+    <main class="main">
+      <h1>Dashboard</h1>
+      <p class="muted" style="margin-top:0;">Store health at a glance.</p>
+      <div class="kpis">
+        <div class="kpi"><b class="tnum"><%= counts.orders %></b><span>Orders</span></div>
+        <div class="kpi"><b class="tnum"><%= counts.products %></b><span>Products</span></div>
+        <div class="kpi"><b class="tnum"><%= counts.users %></b><span>Users</span></div>
+        <div class="kpi"><b class="tnum"><%= money(report.revenue) %></b><span>Revenue</span></div>
+      </div>
+      <div class="card">
+        <div class="row">
+          <div>
+            <h3 style="color:#fff;">Orders overview</h3>
+            <p class="muted" style="margin:0;"><%= report.placed %> placed · <%= report.delivered %> delivered</p>
+          </div>
+          <div style="text-align:right;">
+            <div class="total" style="color:#fff;"><%= money(report.avgOrder) %></div>
+            <span class="muted">avg. order value</span>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+</body>
+</html>

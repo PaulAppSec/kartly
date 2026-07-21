@@ -1,20 +1,26 @@
+import { Link } from "react-router-dom";
+import { useAuth } from "../context/AuthContext";
+import { useCart } from "../context/CartContext";
 import { useTheme } from "../hooks/useTheme";
 import { Cart, Moon, Search, Sun } from "./Icons";
 
-export function Header({ cartCount = 0 }: { cartCount?: number }) {
+export function Header({ onOpenCart }: { onOpenCart: () => void }) {
   const { theme, toggle } = useTheme();
+  const { user } = useAuth();
+  const { count } = useCart();
+
   return (
     <header className="site-header">
       <div className="container header-row">
-        <a href="/" className="wordmark" aria-label="Kartly home">
+        <Link to="/" className="wordmark" aria-label="Kartly home">
           <span className="glyph" aria-hidden="true" />
           Kartly
-        </a>
+        </Link>
         <nav className="main-nav" aria-label="Primary">
-          <a href="/">Shop</a>
-          <a href="/">Makers</a>
-          <a href="/">Collections</a>
-          <a href="/">Journal</a>
+          <Link to="/">Shop</Link>
+          <Link to="/">Makers</Link>
+          <Link to="/">Collections</Link>
+          <Link to="/">Journal</Link>
         </nav>
         <span className="header-spacer" />
         <div className="header-actions">
@@ -28,11 +34,20 @@ export function Header({ cartCount = 0 }: { cartCount?: number }) {
           >
             {theme === "light" ? <Moon /> : <Sun />}
           </button>
-          <a href="/" className="cart-pill">
+          {user ? (
+            <Link to="/account" className="btn btn-ghost">
+              {user.name.split(" ")[0]}
+            </Link>
+          ) : (
+            <Link to="/login" className="btn btn-ghost">
+              Sign in
+            </Link>
+          )}
+          <button className="cart-pill" onClick={onOpenCart} aria-label="Open cart">
             <Cart width={18} height={18} />
             Cart
-            <span className="count tnum">{cartCount}</span>
-          </a>
+            <span className="count tnum">{count}</span>
+          </button>
         </div>
       </div>
     </header>

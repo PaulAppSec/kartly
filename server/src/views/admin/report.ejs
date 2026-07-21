@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Report · Admin · Kartly</title>
+  <%- include('../partials/styles') %>
+</head>
+<body class="admin">
+  <div class="shell">
+    <%- include('../partials/adminnav') %>
+    <main class="main">
+      <h1>Sales report</h1>
+      <p class="muted" style="margin-top:0;">Generated <%= new Date().toISOString().slice(0,16).replace('T',' ') %></p>
+      <div class="kpis">
+        <div class="kpi"><b class="tnum"><%= report.orderCount %></b><span>Total orders</span></div>
+        <div class="kpi"><b class="tnum"><%= money(report.revenue) %></b><span>Gross revenue</span></div>
+        <div class="kpi"><b class="tnum"><%= money(report.avgOrder) %></b><span>Avg. order</span></div>
+        <div class="kpi"><b class="tnum"><%= report.delivered %></b><span>Delivered</span></div>
+      </div>
+    </main>
+  </div>
+</body>
+</html>

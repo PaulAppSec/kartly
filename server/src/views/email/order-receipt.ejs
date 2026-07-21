@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8" /><title><%= subject %></title></head>
+<body style="margin:0;background:#FAF8F4;font-family:Segoe UI,Roboto,Helvetica,Arial,sans-serif;color:#1A1712;">
+  <div style="max-width:560px;margin:0 auto;padding:32px 20px;">
+    <div style="font-weight:700;font-size:1.3rem;">
+      <span style="display:inline-block;background:#FF5A3C;color:#fff;border-radius:8px;padding:3px 8px;">K</span> Kartly
+    </div>
+    <div style="background:#fff;border:1px solid #ECE6DC;border-radius:16px;padding:28px;margin-top:20px;">
+      <h1 style="font-size:1.4rem;margin:0 0 6px;">Thanks for your order</h1>
+      <p style="color:#8A8175;margin:0 0 20px;">Order <strong><%= order.id %></strong></p>
+      <table style="width:100%;border-collapse:collapse;">
+        <% order.items.forEach(function(i){ %>
+          <tr>
+            <td style="padding:8px 0;border-bottom:1px solid #ECE6DC;"><%= i.product ? i.product.name : 'Item' %> × <%= i.qty %></td>
+            <td style="padding:8px 0;border-bottom:1px solid #ECE6DC;text-align:right;">$<%= (i.unitPrice * i.qty).toFixed(2) %></td>
+          </tr>
+        <% }) %>
+        <tr>
+          <td style="padding:12px 0;font-weight:700;">Total paid</td>
+          <td style="padding:12px 0;font-weight:700;text-align:right;font-size:1.2rem;">$<%= order.total.toFixed(2) %></td>
+        </tr>
+      </table>
+      <p style="margin:20px 0 0;">
+        <a href="<%= receiptUrl %>" style="background:#FF5A3C;color:#fff;font-weight:700;text-decoration:none;padding:11px 20px;border-radius:999px;display:inline-block;">View your receipt</a>
+      </p>
+    </div>
+    <p style="color:#8A8175;font-size:.8rem;text-align:center;margin-top:16px;">Kartly · shop small · local demo</p>
+  </div>
+</body>
+</html>

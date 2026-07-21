@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Invoice <%= order.id %> · Kartly</title>
+  <%- include('partials/styles') %>
+</head>
+<body>
+  <div class="wrap">
+    <div class="row">
+      <div>
+        <div class="brand"><span class="g">K</span> Kartly</div>
+        <p class="muted" style="margin:6px 0 0;">Kartly Marketplace Ltd · A local demo</p>
+      </div>
+      <div style="text-align:right;">
+        <h2 style="margin:0;">Invoice</h2>
+        <span class="muted"><%= order.id %></span>
+      </div>
+    </div>
+    <div class="card" style="margin-top:24px;">
+      <div class="row">
+        <div><span class="muted">Bill to</span><br /><strong><%= email %></strong></div>
+        <div style="text-align:right;"><span class="muted">Date</span><br /><%= order.createdAt.slice(0,10) %></div>
+      </div>
+      <table style="margin-top:20px;">
+        <thead><tr><th>Description</th><th class="tnum">Qty</th><th class="tnum">Unit</th><th class="tnum">Line total</th></tr></thead>
+        <tbody>
+          <% order.items.forEach(function(i){ %>
+            <tr>
+              <td><%= i.product ? i.product.name : 'Item' %></td>
+              <td class="tnum"><%= i.qty %></td>
+              <td class="tnum"><%= money(i.unitPrice) %></td>
+              <td class="tnum"><%= money(i.unitPrice * i.qty) %></td>
+            </tr>
+          <% }) %>
+        </tbody>
+        <tfoot>
+          <tr><td colspan="3" style="text-align:right; border:none;"><strong>Total due</strong></td><td class="tnum total" style="border:none;"><%= money(order.total) %></td></tr>
+        </tfoot>
+      </table>
+    </div>
+    <p class="muted" style="text-align:center; margin-top:20px;">Thank you for shopping small.</p>
+  </div>
+</body>
+</html>

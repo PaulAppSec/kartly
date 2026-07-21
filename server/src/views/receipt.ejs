@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Receipt · Kartly</title>
+  <%- include('partials/styles') %>
+</head>
+<body>
+  <div class="wrap">
+    <div class="row">
+      <div class="brand"><span class="g">K</span> Kartly</div>
+      <span class="tag">Receipt</span>
+    </div>
+    <div class="card" style="margin-top:24px;">
+      <div class="row">
+        <div>
+          <h2>Thanks for your order</h2>
+          <p class="muted" style="margin:0;">Order <strong><%= order.id %></strong></p>
+          <p class="muted" style="margin:0;">Billed to <%= email %></p>
+        </div>
+        <div style="text-align:right;">
+          <span class="muted"><%= order.createdAt.slice(0,10) %></span><br />
+          <span class="tag" style="background:#D8ECEC; color:#0E7C7B;"><%= order.status %></span>
+        </div>
+      </div>
+      <table style="margin-top:20px;">
+        <thead><tr><th>Item</th><th class="tnum">Qty</th><th class="tnum">Unit</th><th class="tnum">Amount</th></tr></thead>
+        <tbody>
+          <% order.items.forEach(function(i){ %>
+            <tr>
+              <td><%= i.product ? i.product.name : 'Item' %></td>
+              <td class="tnum"><%= i.qty %></td>
+              <td class="tnum"><%= money(i.unitPrice) %></td>
+              <td class="tnum"><%= money(i.unitPrice * i.qty) %></td>
+            </tr>
+          <% }) %>
+        </tbody>
+      </table>
+      <div class="row" style="margin-top:20px; justify-content:flex-end; gap:40px;">
+        <% if (order.couponCode) { %><span class="muted">Coupon <strong><%= order.couponCode %></strong></span><% } %>
+        <div style="text-align:right;">
+          <div class="muted">Total paid</div>
+          <div class="total"><%= money(order.total) %></div>
+        </div>
+      </div>
+    </div>
+    <p class="muted" style="text-align:center; margin-top:20px;">
+      <a href="/invoice/<%= order.id %>">View invoice</a>
+    </p>
+  </div>
+</body>
+</html>

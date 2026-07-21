@@ -1,17 +1,14 @@
 import { useEffect, useMemo, useState } from "react";
+import { Link } from "react-router-dom";
 import { api, type Product } from "../api/client";
 import { ProductCard, ProductCardSkeleton } from "../components/ProductCard";
 import { Arrow, Leaf, Shield, Truck } from "../components/Icons";
-import { useToast } from "../components/Toaster";
+import { money } from "../lib/format";
 
-const money = (n: number) =>
-  new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(n);
-
-export function Home({ onAdd }: { onAdd: (p: Product) => void }) {
+export function Home({ onOpenCart }: { onOpenCart: () => void }) {
   const [products, setProducts] = useState<Product[] | null>(null);
   const [error, setError] = useState(false);
   const [active, setActive] = useState("All");
-  const toast = useToast();
 
   useEffect(() => {
     let live = true;
@@ -33,11 +30,6 @@ export function Home({ onAdd }: { onAdd: (p: Product) => void }) {
   const visible =
     products?.filter((p) => (active === "All" ? true : p.category === active)) ?? [];
 
-  const add = (p: Product) => {
-    onAdd(p);
-    toast(`Added “${p.name}” to cart`);
-  };
-
   return (
     <main>
       {/* ── Hero ─────────────────────────────────────────── */}
@@ -52,12 +44,12 @@ export function Home({ onAdd }: { onAdd: (p: Product) => void }) {
             stitched, pressed, and shipped in small batches.
           </p>
           <div className="hero-cta">
-            <a href="/" className="btn btn-primary">
+            <a href="#catalog" className="btn btn-primary">
               Shop the catalog <Arrow width={18} height={18} />
             </a>
-            <a href="/" className="btn btn-ghost">
+            <Link to="/" className="btn btn-ghost">
               Meet the makers
-            </a>
+            </Link>
           </div>
           <div className="hero-stats">
             <div className="stat">
@@ -76,13 +68,13 @@ export function Home({ onAdd }: { onAdd: (p: Product) => void }) {
         </div>
 
         <div className="hero-media">
-          <div className="frame">
+          <Link to={featured ? `/product/${featured.id}` : "/"} className="frame">
             {featured?.imageUrl ? (
               <img src={featured.imageUrl} alt={featured.name} width={640} height={800} />
             ) : (
               <div className="skeleton" style={{ width: "100%", height: "100%" }} />
             )}
-          </div>
+          </Link>
           {featured && (
             <div className="price-tag">
               {money(featured.price)}
@@ -135,15 +127,15 @@ export function Home({ onAdd }: { onAdd: (p: Product) => void }) {
       </section>
 
       {/* ── Catalog ──────────────────────────────────────── */}
-      <section className="container section">
+      <section className="container section" id="catalog">
         <div className="section-head">
           <div>
             <span className="eyebrow">Fresh on the shelves</span>
             <h2>This week's picks</h2>
           </div>
-          <a href="/" className="btn btn-ghost">
-            View all <Arrow width={16} height={16} />
-          </a>
+          <button className="btn btn-ghost" onClick={onOpenCart}>
+            View cart <Arrow width={16} height={16} />
+          </button>
         </div>
 
         {categories.length > 0 && (
@@ -180,7 +172,7 @@ export function Home({ onAdd }: { onAdd: (p: Product) => void }) {
         ) : (
           <div className="product-grid">
             {visible.map((p) => (
-              <ProductCard key={p.id} product={p} onAdd={add} />
+              <ProductCard key={p.id} product={p} onAdded={onOpenCart} />
             ))}
           </div>
         )}

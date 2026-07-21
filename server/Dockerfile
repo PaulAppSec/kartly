@@ -38,10 +38,13 @@ COPY --from=build /app/package.json ./package.json
 COPY --from=build /app/server/package.json ./server/package.json
 COPY --from=build /app/server/dist ./server/dist
 COPY --from=build /app/server/prisma ./server/prisma
+COPY --from=build /app/server/src/views ./server/src/views
+COPY --from=build /app/server/downloads ./server/downloads
+COPY --from=build /app/server/decoys ./server/decoys
 COPY --from=build /app/client/dist ./client/dist
 COPY --from=build /app/openapi.yaml ./openapi.yaml
 COPY server/docker-entrypoint.sh ./server/docker-entrypoint.sh
-RUN chmod +x ./server/docker-entrypoint.sh
+RUN chmod +x ./server/docker-entrypoint.sh && mkdir -p /app/uploads /app/outbox
 
 EXPOSE 4000
 ENTRYPOINT ["./server/docker-entrypoint.sh"]

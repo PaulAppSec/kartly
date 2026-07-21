@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title><%= product.name %> · Kartly</title>
+  <%- include('partials/styles') %>
+</head>
+<body>
+  <div class="wrap" style="max-width:680px;">
+    <div class="brand"><span class="g">K</span> Kartly</div>
+    <% if (q) { %>
+      <p class="muted" style="margin-top:16px;">Results for “<%= q %>”</p>
+    <% } %>
+    <div class="card" style="margin-top:24px; overflow:hidden; padding:0;">
+      <% if (product.imageUrl) { %>
+        <img src="<%= product.imageUrl %>" alt="<%= product.name %>" style="width:100%; aspect-ratio:16/10; object-fit:cover;" />
+      <% } %>
+      <div style="padding:28px;">
+        <span class="tag"><%= product.category %></span>
+        <h1 style="margin-top:12px;"><%= product.name %></h1>
+        <p class="muted"><%= product.description %></p>
+        <div class="row" style="margin-top:16px;">
+          <span class="total"><%= money(product.price) %></span>
+          <a class="btn" href="/">Shop on Kartly</a>
+        </div>
+      </div>
+    </div>
+    <p class="muted" style="text-align:center; margin-top:20px;">Shared from Kartly — the modern local marketplace.</p>
+  </div>
+</body>
+</html>

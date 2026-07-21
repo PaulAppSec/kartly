@@ -39,16 +39,21 @@ services:
       DATABASE_URL: ${DATABASE_URL:-postgresql://kartly:kartly_dev_password@db:5432/kartly?schema=public}
       JWT_ACCESS_SECRET: ${JWT_ACCESS_SECRET:-dev-access-secret-change-me}
       JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:-dev-refresh-secret-change-me}
+      JWT_RESET_SECRET: ${JWT_RESET_SECRET:-dev-reset-secret-change-me}
       JWT_ACCESS_TTL: ${JWT_ACCESS_TTL:-15m}
       JWT_REFRESH_TTL: ${JWT_REFRESH_TTL:-7d}
+      JWT_RESET_TTL: ${JWT_RESET_TTL:-30m}
       UPLOAD_DIR: ${UPLOAD_DIR:-/app/uploads}
       MAX_UPLOAD_BYTES: ${MAX_UPLOAD_BYTES:-5242880}
+      OUTBOX_DIR: ${OUTBOX_DIR:-/app/outbox}
     # localhost-only bind. Never expose Kartly to the network.
     ports:
       - "127.0.0.1:4000:4000"
     volumes:
       - kartly-uploads:/app/uploads
+      - kartly-outbox:/app/outbox
 
 volumes:
   kartly-db-data:
   kartly-uploads:
+  kartly-outbox:

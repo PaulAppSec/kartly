@@ -8,8 +8,11 @@ export const registerSchema = z.object({
   name: z.string().min(1).max(120),
 });
 
+// ⚠️ VULNERABLE (main) — loose on purpose (§2: "Zod absent/loose on main").
+// Not requiring a valid email format lets the SQLi payload (#2) through to the
+// raw query. Fix (fix/sqli-login) restores `.email()` + parameterized lookup.
 export const loginSchema = z.object({
-  email: z.string().email().max(200),
+  email: z.string().min(1).max(200),
   password: z.string().min(1).max(200),
 });
 

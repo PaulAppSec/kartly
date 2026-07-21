@@ -1,7 +1,7 @@
 import type { User } from "@prisma/client";
+import { prisma } from "../data/prisma.js";
 import { userRepo } from "../data/userRepo.js";
 import { env } from "../lib/env.js";
-import { hashPassword, verifyPassword } from "../lib/hashing.js";
 import { sendEmail } from "../lib/mailer.js";
 import {
   signAccessToken,
@@ -49,20 +49,26 @@ export const authService = {
     if (existing) throw new HttpError(409, "An account with that email already exists.");
 
     // role is intentionally NOT taken from input — always CUSTOMER on signup.
+    // ⚠️ VULNERABLE (main) — VULNS.md #4 (broken auth): the password is stored
+    // in PLAINTEXT. Fix (fix/auth) hashes with a strong KDF.
     const user = await userRepo.create({
       email: input.email,
-      passwordHash: hashPassword(input.password),
+      passwordHash: input.password,
       name: input.name,
     });
     return { user: toPublicUser(user), ...issueTokens(user) };
   },
 
+  // ⚠️ VULNERABLE (main) — VULNS.md #2 (SQLi auth bypass) + #4 (broken auth).
+  // Both the email and the plaintext password are concatenated into raw SQL, so
+  // `admin@kartly.test'-- ` comments out the password check and logs in as
+  // admin. Fix (fix/sqli-login) parameterizes and compares a hash.
   async login(input: LoginInput) {
-    const user = await userRepo.findByEmail(input.email);
-    // Generic failure message — don't reveal whether the email exists.
-    if (!user || !verifyPassword(input.password, user.passwordHash)) {
-      throw new HttpError(401, "Incorrect email or password.");
-    }
+    const rows = await prisma.$queryRawUnsafe<User[]>(
+      `SELECT * FROM "User" WHERE email = '${input.email}' AND "passwordHash" = '${input.password}'`,
+    );
+    const user = rows[0];
+    if (!user) throw new HttpError(401, "Incorrect email or password.");
     return { user: toPublicUser(user), ...issueTokens(user) };
   },
 
@@ -105,6 +111,7 @@ export const authService = {
     }
     const user = await userRepo.findById(userId);
     if (!user) throw new HttpError(400, "This reset link is invalid or has expired.");
-    await userRepo.update(user.id, { passwordHash: hashPassword(newPassword) });
+    // ⚠️ VULNERABLE (main) — #4 broken auth: stored in plaintext.
+    await userRepo.update(user.id, { passwordHash: newPassword });
   },
 };

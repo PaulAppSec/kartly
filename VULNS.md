@@ -8,18 +8,18 @@
 **Status legend:** 🔴 pending (not yet introduced) · 🟠 live on `main` (documented + exploit test) · 🟢 fixed on `fix/<slug>` (PR open, fixed test passing)
 
 > **Phase status:** Phase 3 in progress (Batch 1 = the injection + broken-auth
-> cluster). **1 of 24 live:** #1 SQLi (UNION). Each live vuln has a passing
-> exploit test in `server/tests/exploits/`. The rest are still the secure Phase 2
-> baseline.
+> cluster). **3 of 24 live:** #1 SQLi (UNION), #2 SQLi (auth bypass), #4 broken
+> auth. Each has a passing exploit test in `server/tests/exploits/`. The rest are
+> still the secure Phase 2 baseline.
 
 ## Matrix
 
 | # | Vuln class | Lives in | Fix branch | Status |
 |---|-----------|----------|------------|--------|
 | 1 | SQLi – UNION/data | `GET /api/search?q=` | `fix/sqli` | 🟠 live on `main` |
-| 2 | SQLi – auth bypass | `POST /api/auth/login` | `fix/sqli-login` | 🔴 pending |
+| 2 | SQLi – auth bypass | `POST /api/auth/login` | `fix/sqli-login` | 🟠 live on `main` |
 | 3 | Blind SQLi (boolean/time) | `GET /api/products?sort=` | `fix/blind-sqli` | 🔴 pending |
-| 4 | Broken auth | login / register / seed | `fix/auth` | 🔴 pending |
+| 4 | Broken auth | login / register / seed | `fix/auth` | 🟠 live on `main` |
 | 5 | Broken access control (IDOR) | `GET /api/orders/:id`, `/messages/:id` | `fix/idor` | 🔴 pending |
 | 6 | Privilege escalation | `/api/admin/*` | `fix/authz-admin` | 🔴 pending |
 | 7 | Mass assignment | `POST /api/register`, `PATCH /api/me` | `fix/mass-assignment` | 🔴 pending |
@@ -79,14 +79,47 @@ the placeholders below reserve the slot and record the plan.
 - **Detect:** grep for `$queryRawUnsafe` / string-built SQL; WAF sees `UNION SELECT`; DB logs show a `UNION` against `"User"` from the search path.
 - **Exploit test:** `server/tests/exploits/01-sqli-search.test.ts`
 
-### 2. SQLi – auth bypass — 🔴 pending
-_Batch 1 (next commit) — raw concatenated login query in `authService.login`._
+### 2. SQLi – auth bypass — 🟠 live on `main`
+- **Where:** `server/src/services/authService.ts` → `POST /api/auth/login`
+- **Vulnerable code:**
+  ```ts
+  const rows = await prisma.$queryRawUnsafe<User[]>(
+    `SELECT * FROM "User" WHERE email = '${input.email}' AND "passwordHash" = '${input.password}'`,
+  );
+  ```
+  (The login Zod schema is also loosened — no `.email()` — so the payload gets through, per §2 "Zod loose on main".)
+- **Exploit (copy-paste):**
+  ```
+  POST /api/auth/login
+  { "email": "admin@kartly.test'-- ", "password": "anything" }
+  ```
+  The `'-- ` closes the string and comments out the password check → logs in as admin.
+- **Impact:** Authentication bypass. Any known email → full session as that user, including admin, with no password.
+- **Fix (`fix/sqli-login`):** parameterized lookup by email + restore strict validation, then verify a hashed password in code (`fix/auth` supplies the hash).
+- **Detect:** raw SQL in the auth path; login succeeding with a quote/`--` in the email field; failed-login count that doesn't match successes.
+- **Exploit test:** `server/tests/exploits/02-sqli-login-bypass.test.ts`
 
 ### 3. Blind SQLi (boolean/time) — 🔴 pending
 _Batch 2 — `GET /api/products?sort=` raw ORDER BY._
 
-### 4. Broken auth — 🔴 pending
-_Batch 1 (next commit) — plaintext password storage in seed + register/reset._
+### 4. Broken auth — 🟠 live on `main`
+- **Where:** `server/prisma/seed.ts`, `authService.register` / `resetPassword` (plaintext storage), no lockout.
+- **Vulnerable code:**
+  ```ts
+  function hashPassword(plain: string): string { return plain; } // seed
+  // register/reset:
+  passwordHash: input.password,
+  ```
+- **Exploit:** dump `passwordHash` via #1 → it *is* the password (`alice1234`, not a hash). Combined with unlimited attempts (see #24) this is trivial credential compromise.
+- **Impact:** A DB read (backup, SQLi, insider) exposes every password directly; password reuse spreads the breach to users' other sites.
+- **Fix (`fix/auth`):** store a strong KDF hash (argon2id/bcrypt/scrypt), constant-time verify, account lockout / throttling.
+- **Detect:** passwords readable as cleartext in the DB; no `$`-prefixed hash format; no lockout after repeated failures.
+- **Exploit test:** `server/tests/exploits/04-broken-auth-plaintext.test.ts`
+
+> **Note (introduction commit):** #2 and #4 were introduced in a single commit
+> because the raw-SQL login only functions over plaintext credentials — splitting
+> them yields an intermediate commit where no one can log in. They remain
+> separate rows and separate fix branches (`fix/sqli-login`, `fix/auth`).
 ### 5. Broken access control (IDOR) — 🔴 pending
 ### 6. Privilege escalation — 🔴 pending
 ### 7. Mass assignment — 🔴 pending

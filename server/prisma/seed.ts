@@ -1,14 +1,13 @@
 import { PrismaClient, Role } from "@prisma/client";
-import { randomBytes, scryptSync } from "node:crypto";
 
 const prisma = new PrismaClient();
 
-// Secure-baseline password hashing (scrypt, stdlib). On `main` this stays
-// honest until Phase 3 deliberately reseeds some rows as plaintext (vuln #4).
+// ⚠️ VULNERABLE ON PURPOSE (main) — VULNS.md #4 (broken auth).
+// Passwords are seeded in PLAINTEXT. Combined with the raw-SQL login (#2) and
+// the UNION SQLi search (#1), any user's credentials are trivially readable.
+// The fix (fix/auth) stores a strong KDF hash instead.
 function hashPassword(plain: string): string {
-  const salt = randomBytes(16).toString("hex");
-  const hash = scryptSync(plain, salt, 64).toString("hex");
-  return `scrypt$${salt}$${hash}`;
+  return plain;
 }
 
 const img = (slug: string) => `https://picsum.photos/seed/kartly-${slug}/800/800`;

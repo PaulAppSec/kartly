@@ -1,0 +1,30 @@
+# dependencies
+node_modules/
+.pnpm-store/
+
+# build output
+dist/
+client/dist/
+server/dist/
+
+# env / secrets (kartly ships .env.example only)
+.env
+.env.local
+*.local
+
+# prisma
+server/prisma/*.db
+
+# uploads written at runtime (keep the dir, ignore contents)
+uploads/*
+!uploads/.gitkeep
+
+# logs & os cruft
+*.log
+npm-debug.log*
+.DS_Store
+Thumbs.db
+
+# editor
+.vscode/
+.idea/

@@ -1,0 +1,80 @@
+openapi: 3.0.3
+info:
+  title: Kartly API
+  version: 2.0.0-vulnerable
+  description: >
+    REST API for Kartly, a deliberately-vulnerable marketplace used for AppSec
+    education. LOCAL ONLY — never deploy. Endpoints are added phase by phase;
+    Phase 1 ships health + read-only catalog.
+servers:
+  - url: http://localhost:4000
+    description: Local (docker-compose)
+tags:
+  - name: system
+  - name: catalog
+paths:
+  /api/health:
+    get:
+      tags: [system]
+      summary: Liveness and database readiness
+      responses:
+        "200":
+          description: Service healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: string, example: ok }
+                  db: { type: string, example: up }
+                  time: { type: string, format: date-time }
+        "503":
+          description: Database unavailable
+  /api/products:
+    get:
+      tags: [catalog]
+      summary: List catalog products
+      responses:
+        "200":
+          description: Product list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  products:
+                    type: array
+                    items: { $ref: "#/components/schemas/Product" }
+  /api/products/{id}:
+    get:
+      tags: [catalog]
+      summary: Get a single product
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Product
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  product: { $ref: "#/components/schemas/Product" }
+        "404":
+          description: Not found
+components:
+  schemas:
+    Product:
+      type: object
+      properties:
+        id: { type: string }
+        name: { type: string }
+        description: { type: string }
+        price: { type: number, format: float }
+        stock: { type: integer }
+        category: { type: string }
+        imageUrl: { type: string, nullable: true }
+        createdAt: { type: string, format: date-time }

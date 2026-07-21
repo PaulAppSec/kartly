@@ -1,0 +1,140 @@
+/* ─────────────────────────────────────────────────────────────
+   Kartly design tokens (spec §4).
+   Warm, premium, human marketplace. Coral is reserved for price /
+   commerce moments; teal for trust marks (verified seller, secure).
+   ───────────────────────────────────────────────────────────── */
+
+:root,
+:root[data-theme="light"] {
+  --ink: #1a1712;
+  --paper: #faf8f4;
+  --surface: #ffffff;
+  --surface-2: #f4f0e9;
+  --brand: #ff5a3c;
+  --brand-ink: #ffffff;
+  --brand-soft: #ffe8e2;
+  --accent: #0e7c7b;
+  --accent-soft: #d8ecec;
+  --muted: #8a8175;
+  --line: #ece6dc;
+  --success: #1f9d55;
+  --danger: #d64545;
+  --warn: #e0a400;
+
+  --shadow-sm: 0 2px 8px rgba(26, 23, 18, 0.05);
+  --shadow: 0 6px 24px rgba(26, 23, 18, 0.06);
+  --shadow-lg: 0 18px 48px rgba(26, 23, 18, 0.12);
+}
+
+:root[data-theme="dark"] {
+  --ink: #f3eee6;
+  --paper: #14110d;
+  --surface: #1e1a15;
+  --surface-2: #26211a;
+  --brand: #ff6a4e;
+  --brand-ink: #1a1712;
+  --brand-soft: #3a231d;
+  --accent: #35b3ab;
+  --accent-soft: #123634;
+  --muted: #9a9184;
+  --line: #2e2820;
+  --success: #4cc47e;
+  --danger: #e8756f;
+  --warn: #f0bf4a;
+
+  --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.35);
+  --shadow: 0 6px 24px rgba(0, 0, 0, 0.4);
+  --shadow-lg: 0 18px 48px rgba(0, 0, 0, 0.55);
+}
+
+:root {
+  /* type */
+  --font-display: "Space Grotesk", ui-sans-serif, system-ui, sans-serif;
+  --font-body: "Plus Jakarta Sans", ui-sans-serif, system-ui, sans-serif;
+
+  /* 8px spacing scale */
+  --s-1: 4px;
+  --s-2: 8px;
+  --s-3: 12px;
+  --s-4: 16px;
+  --s-5: 24px;
+  --s-6: 32px;
+  --s-7: 48px;
+  --s-8: 64px;
+  --s-9: 96px;
+
+  /* radii */
+  --r-sm: 10px;
+  --r: 16px;
+  --r-lg: 20px;
+  --r-pill: 999px;
+
+  /* layout */
+  --maxw: 1200px;
+
+  --focus: 0 0 0 3px var(--brand-soft), 0 0 0 5px var(--brand);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-size: 16px;
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+h1,
+h2,
+h3,
+h4 {
+  font-family: var(--font-display);
+  font-weight: 600;
+  line-height: 1.05;
+  letter-spacing: -0.02em;
+  margin: 0;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+img {
+  max-width: 100%;
+  display: block;
+}
+
+button {
+  font-family: inherit;
+  cursor: pointer;
+}
+
+/* prices & any tabular numeric data */
+.tnum {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1;
+}
+
+:where(a, button, input, select, textarea):focus-visible {
+  outline: none;
+  box-shadow: var(--focus);
+  border-radius: var(--r-sm);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.001ms !important;
+    transition-duration: 0.001ms !important;
+  }
+}

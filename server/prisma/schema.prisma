@@ -1,0 +1,110 @@
+// Kartly data model (spec §5).
+// NOTE: `passwordHash` intentionally stores PLAINTEXT for a couple of seeded
+// users on `main` (broken-auth lesson, vuln #4) — introduced in Phase 3.
+
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "debian-openssl-3.0.x"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  CUSTOMER
+  SELLER
+  ADMIN
+}
+
+model User {
+  id           String   @id @default(uuid())
+  email        String   @unique
+  passwordHash String
+  name         String
+  bio          String? // stored-XSS sink (vuln #8)
+  avatarUrl    String? // upload + SSRF sink (vulns #12, #13)
+  role         Role     @default(CUSTOMER) // mass-assignment target (vuln #7)
+  products     Product[]
+  addresses    Address[]
+  orders       Order[]
+  reviews      Review[]
+  messagesOut  Message[] @relation("from")
+  messagesIn   Message[] @relation("to")
+  createdAt    DateTime @default(now())
+}
+
+model Product {
+  id          String   @id @default(uuid())
+  seller      User?    @relation(fields: [sellerId], references: [id])
+  sellerId    String?
+  name        String
+  description String // stored-XSS sink, rendered as HTML on main (vuln #8)
+  price       Decimal @db.Decimal(10, 2) // price-tampering target (vuln #22)
+  stock       Int
+  imageUrl    String? // upload + SSRF sink (vulns #12, #13)
+  category    String   @default("General")
+  reviews     Review[]
+  orderItems  OrderItem[]
+  createdAt   DateTime @default(now())
+}
+
+model Review {
+  id        String   @id @default(uuid())
+  product   Product  @relation(fields: [productId], references: [id])
+  productId String
+  author    User     @relation(fields: [authorId], references: [id])
+  authorId  String
+  body      String // stored-XSS sink (vuln #8)
+  rating    Int
+  createdAt DateTime @default(now())
+}
+
+model Order {
+  id         String      @id @default(uuid()) // IDOR target (vuln #5)
+  customer   User        @relation(fields: [customerId], references: [id])
+  customerId String
+  total      Decimal     @db.Decimal(10, 2)
+  status     String      @default("PLACED")
+  couponCode String?
+  items      OrderItem[]
+  createdAt  DateTime    @default(now())
+}
+
+model OrderItem {
+  id        String  @id @default(uuid())
+  order     Order   @relation(fields: [orderId], references: [id])
+  orderId   String
+  product   Product @relation(fields: [productId], references: [id])
+  productId String
+  qty       Int // negative-qty / price-logic target (vuln #22)
+  unitPrice Decimal @db.Decimal(10, 2)
+}
+
+model Coupon {
+  id         String @id @default(uuid())
+  code       String @unique
+  percentOff Int
+  maxUses    Int
+  uses       Int    @default(0) // coupon reuse / race target (vuln #22)
+}
+
+model Message {
+  id        String   @id @default(uuid()) // IDOR target (vuln #5)
+  from      User     @relation("from", fields: [fromId], references: [id])
+  fromId    String
+  to        User     @relation("to", fields: [toId], references: [id])
+  toId      String
+  body      String // stored-XSS sink (vuln #8)
+  createdAt DateTime @default(now())
+}
+
+model Address {
+  id      String @id @default(uuid())
+  user    User   @relation(fields: [userId], references: [id])
+  userId  String
+  line1   String
+  city    String
+  country String
+}

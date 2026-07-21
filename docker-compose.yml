@@ -1,0 +1,54 @@
+# ─────────────────────────────────────────────────────────────
+#  Kartly — LOCAL ONLY.  Every published port is bound to 127.0.0.1
+#  so nothing is reachable from the network. Do NOT change these to
+#  0.0.0.0 and do NOT deploy this stack. It is intentionally vulnerable.
+# ─────────────────────────────────────────────────────────────
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: kartly-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-kartly}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-kartly_dev_password}
+      POSTGRES_DB: ${POSTGRES_DB:-kartly}
+    # localhost-only; handy for running `prisma migrate` from the host.
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - kartly-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-kartly} -d ${POSTGRES_DB:-kartly}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  app:
+    build:
+      context: .
+      dockerfile: server/Dockerfile
+    container_name: kartly-app
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      NODE_ENV: ${NODE_ENV:-development}
+      PORT: ${PORT:-4000}
+      CLIENT_ORIGIN: ${CLIENT_ORIGIN:-http://localhost:4000}
+      DATABASE_URL: ${DATABASE_URL:-postgresql://kartly:kartly_dev_password@db:5432/kartly?schema=public}
+      JWT_ACCESS_SECRET: ${JWT_ACCESS_SECRET:-dev-access-secret-change-me}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:-dev-refresh-secret-change-me}
+      JWT_ACCESS_TTL: ${JWT_ACCESS_TTL:-15m}
+      JWT_REFRESH_TTL: ${JWT_REFRESH_TTL:-7d}
+      UPLOAD_DIR: ${UPLOAD_DIR:-/app/uploads}
+      MAX_UPLOAD_BYTES: ${MAX_UPLOAD_BYTES:-5242880}
+    # localhost-only bind. Never expose Kartly to the network.
+    ports:
+      - "127.0.0.1:4000:4000"
+    volumes:
+      - kartly-uploads:/app/uploads
+
+volumes:
+  kartly-db-data:
+  kartly-uploads:

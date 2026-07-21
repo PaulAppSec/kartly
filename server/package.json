@@ -9,7 +9,8 @@
     "start": "node dist/server.js",
     "seed": "tsx prisma/seed.ts",
     "prisma:generate": "prisma generate",
-    "test": "vitest run"
+    "test": "vitest run tests/exploits",
+    "test:fixed": "vitest run tests/fixed"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"

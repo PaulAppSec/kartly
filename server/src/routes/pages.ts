@@ -10,6 +10,10 @@ pagesRouter.get("/receipt/:orderId", requirePageAuth, pageController.receipt);
 pagesRouter.get("/invoice/:orderId", requirePageAuth, pageController.invoice);
 pagesRouter.get("/order-confirmation/:orderId", requirePageAuth, pageController.orderConfirmation);
 
+// Post-login redirect (open redirect on `main`, #18). Anonymous users fall
+// through (next()) to the SPA login form.
+pagesRouter.get("/login", pageController.loginRedirect);
+
 // Public.
 pagesRouter.get("/share/product/:id", pageController.shareProduct);
 pagesRouter.get("/store/:sellerId", pageController.store);

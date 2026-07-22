@@ -7,10 +7,10 @@
 
 **Status legend:** 🔴 pending (not yet introduced) · 🟠 live on `main` (documented + exploit test) · 🟢 fixed on `fix/<slug>` (PR open, fixed test passing)
 
-> **Phase status:** Phase 3 in progress. **17 of 24 live:** #1–#17. Each has a
+> **Phase status:** Phase 3 in progress. **18 of 24 live:** #1–#18. Each has a
 > passing exploit test in `server/tests/exploits/` and a saved artifact in
 > `artifacts/`. The dangerous classes are sandboxed to the container per §7
-> (decoys only). #18–#24 are still the secure Phase 2 baseline.
+> (decoys only). #19–#24 are still the secure Phase 2 baseline.
 
 ## Matrix
 
@@ -33,7 +33,7 @@
 | 15 | Command injection (RCE) | admin export (`POST /api/admin/export`) | `fix/cmdi` | 🟠 live on `main` |
 | 16 | SSTI | seller store-announcement template | `fix/ssti` | 🟠 live on `main` |
 | 17 | XXE | bulk XML product import | `fix/xxe` | 🟠 live on `main` |
-| 18 | Open redirect | `GET /login?returnTo=` | `fix/open-redirect` | 🔴 pending |
+| 18 | Open redirect | `GET /login?returnTo=` | `fix/open-redirect` | 🟠 live on `main` |
 | 19 | JWT weaknesses | API auth | `fix/jwt` | 🔴 pending |
 | 20 | Security misconfig | verbose errors, `/.env`, debug route | `fix/misconfig` | 🔴 pending |
 | 21 | Sensitive data exposure | API returns `passwordHash`/tokens | `fix/data-exposure` | 🔴 pending |
@@ -295,7 +295,17 @@ the placeholders below reserve the slot and record the plan.
 - **Detect:** XML parser with entity/DTD resolution enabled; imports containing `<!ENTITY … SYSTEM …>`.
 - **Sandbox (§7):** demo reads a planted decoy (`server/decoys/secret.txt`); container-only.
 - **Exploit test:** `server/tests/exploits/17-xxe.test.ts`
-### 18. Open redirect — 🔴 pending
+### 18. Open redirect — 🟠 live on `main`
+- **Where:** `server/src/controllers/pageController.ts` (`loginRedirect`) → `GET /login?returnTo=`.
+- **Vulnerable code:** for an authenticated user, `res.redirect(returnTo)` with no validation of the target.
+- **Exploit (copy-paste):**
+  ```
+  GET /login?returnTo=https://evil.example/phish   (with a valid session) → 302 to evil
+  ```
+- **Impact:** Phishing (a trusted Kartly link lands on the attacker's page) and token/credential leakage via the referrer.
+- **Fix (`fix/open-redirect`):** allow only same-origin **relative** paths (reject `//`, absolute URLs, backslashes); default to `/`.
+- **Detect:** `res.redirect(userInput)` without an allowlist; `returnTo`/`next`/`url` params carrying absolute URLs.
+- **Exploit test:** `server/tests/exploits/18-open-redirect.test.ts`
 ### 19. JWT weaknesses — 🔴 pending
 ### 20. Security misconfig — 🔴 pending
 ### 21. Sensitive data exposure — 🔴 pending

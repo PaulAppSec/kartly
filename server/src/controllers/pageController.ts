@@ -1,6 +1,7 @@
 import { join, resolve } from "node:path";
 import ejs from "ejs";
 import type { NextFunction, Request, Response } from "express";
+import { ACCESS_COOKIE } from "../lib/cookies.js";
 import { announcementService } from "../services/announcementService.js";
 import { orderService } from "../services/orderService.js";
 import { productService } from "../services/productService.js";
@@ -85,6 +86,21 @@ export const pageController = {
     } catch (err) {
       next(err);
     }
+  },
+
+  // ⚠️ VULNERABLE ON PURPOSE (main) — VULNS.md #18 (Open redirect). When an
+  // already-authenticated user hits /login?returnTo=…, they're bounced to the
+  // target with NO validation, so `returnTo=//evil.com` or an absolute URL
+  // sends them off-site (phishing / token-leaking landing). The fix
+  // (fix/open-redirect) allows only same-origin relative paths. Anonymous users
+  // fall through to the SPA login form.
+  loginRedirect(req: Request, res: Response, next: NextFunction) {
+    const returnTo = typeof req.query.returnTo === "string" ? req.query.returnTo : "";
+    const authenticated = Boolean(req.cookies?.[ACCESS_COOKIE]);
+    if (returnTo && authenticated) {
+      return res.redirect(returnTo);
+    }
+    next();
   },
 
   // ⚠️ VULNERABLE ON PURPOSE (main) — VULNS.md #14 (Path traversal / LFI). The

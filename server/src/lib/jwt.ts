@@ -33,8 +33,18 @@ export function signRefreshToken(claims: RefreshClaims): string {
   });
 }
 
+// ⚠️ VULNERABLE ON PURPOSE (main) — VULNS.md #19 (JWT weaknesses). The verifier
+// honours the token's OWN `alg` header and accepts `alg:none`, so an attacker
+// forges an unsigned token (`{"alg":"none"}` + arbitrary claims) and becomes
+// any user/role. The signing secret is also the weak, known default. The fix
+// (fix/jwt) pins `algorithms:["HS256"]`, requires a strong secret, and checks
+// expiry.
 export function verifyAccessToken(token: string): AccessClaims {
-  return jwt.verify(token, env.jwtAccessSecret, { algorithms: [ALG] }) as AccessClaims;
+  const decoded = jwt.decode(token, { complete: true });
+  if (decoded && (decoded.header as { alg?: string }).alg === "none") {
+    return decoded.payload as AccessClaims; // trusts an unsigned token
+  }
+  return jwt.verify(token, env.jwtAccessSecret, { algorithms: [ALG, "none"] }) as AccessClaims;
 }
 
 export function verifyRefreshToken(token: string): RefreshClaims {

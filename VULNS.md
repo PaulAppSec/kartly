@@ -7,10 +7,10 @@
 
 **Status legend:** 🔴 pending (not yet introduced) · 🟠 live on `main` (documented + exploit test) · 🟢 fixed on `fix/<slug>` (PR open, fixed test passing)
 
-> **Phase status:** Phase 3 in progress. **18 of 24 live:** #1–#18. Each has a
+> **Phase status:** Phase 3 in progress. **19 of 24 live:** #1–#19. Each has a
 > passing exploit test in `server/tests/exploits/` and a saved artifact in
 > `artifacts/`. The dangerous classes are sandboxed to the container per §7
-> (decoys only). #19–#24 are still the secure Phase 2 baseline.
+> (decoys only). #20–#24 are still the secure Phase 2 baseline.
 
 ## Matrix
 
@@ -34,7 +34,7 @@
 | 16 | SSTI | seller store-announcement template | `fix/ssti` | 🟠 live on `main` |
 | 17 | XXE | bulk XML product import | `fix/xxe` | 🟠 live on `main` |
 | 18 | Open redirect | `GET /login?returnTo=` | `fix/open-redirect` | 🟠 live on `main` |
-| 19 | JWT weaknesses | API auth | `fix/jwt` | 🔴 pending |
+| 19 | JWT weaknesses | API auth | `fix/jwt` | 🟠 live on `main` |
 | 20 | Security misconfig | verbose errors, `/.env`, debug route | `fix/misconfig` | 🔴 pending |
 | 21 | Sensitive data exposure | API returns `passwordHash`/tokens | `fix/data-exposure` | 🔴 pending |
 | 22 | Business logic | checkout: qty/price/coupon | `fix/business-logic` | 🔴 pending |
@@ -306,7 +306,20 @@ the placeholders below reserve the slot and record the plan.
 - **Fix (`fix/open-redirect`):** allow only same-origin **relative** paths (reject `//`, absolute URLs, backslashes); default to `/`.
 - **Detect:** `res.redirect(userInput)` without an allowlist; `returnTo`/`next`/`url` params carrying absolute URLs.
 - **Exploit test:** `server/tests/exploits/18-open-redirect.test.ts`
-### 19. JWT weaknesses — 🔴 pending
+### 19. JWT weaknesses — 🟠 live on `main`
+- **Where:** `server/src/lib/jwt.ts` (`verifyAccessToken`) → all API auth via `requireAuth`.
+- **Vulnerable code:** the verifier reads the token's own `alg` header and, when it is `none`, returns the payload unverified; it also accepts `"none"` in the algorithms list and uses the weak default secret.
+- **Exploit (copy-paste):**
+  ```
+  header  = base64url({"alg":"none","typ":"JWT"})
+  payload = base64url({"sub":"u-alice","role":"ADMIN","email":"attacker@evil.example"})
+  token   = `${header}.${payload}.`     (empty signature)
+  → Authorization: Bearer <token>  reaches ADMIN/SELLER-gated endpoints
+  ```
+- **Impact:** Full authentication/authorization bypass — forge any user and role without the secret.
+- **Fix (`fix/jwt`):** verify with `algorithms:["HS256"]` only, a strong random secret, and enforce `exp`.
+- **Detect:** `jwt.decode` used as if it verified; `algorithms` omitted or containing `none`; tokens with an empty signature accepted.
+- **Exploit test:** `server/tests/exploits/19-jwt.test.ts`
 ### 20. Security misconfig — 🔴 pending
 ### 21. Sensitive data exposure — 🔴 pending
 ### 22. Business logic — 🔴 pending

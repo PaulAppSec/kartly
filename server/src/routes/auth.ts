@@ -1,6 +1,5 @@
 import { Router } from "express";
 import { authController } from "../controllers/authController.js";
-import { authLimiter } from "../middleware/rateLimit.js";
 import { validate } from "../middleware/validate.js";
 import {
   forgotPasswordSchema,
@@ -9,23 +8,16 @@ import {
   resetPasswordSchema,
 } from "../schemas/authSchemas.js";
 
+// ⚠️ VULNERABLE ON PURPOSE (main) — VULNS.md #24 (No rate limiting). The
+// per-credential-endpoint limiter (authLimiter) has been removed from login,
+// register, and password reset, so brute force / credential stuffing / reset
+// spraying run unthrottled. The fix (fix/rate-limit) reinstates authLimiter.
 export const authRouter = Router();
 
-authRouter.post("/register", authLimiter, validate(registerSchema), authController.register);
-authRouter.post("/login", authLimiter, validate(loginSchema), authController.login);
+authRouter.post("/register", validate(registerSchema), authController.register);
+authRouter.post("/login", validate(loginSchema), authController.login);
 authRouter.post("/refresh", authController.refresh);
 authRouter.post("/logout", authController.logout);
 
-// Password reset. The rate limiter here is the secure baseline for vuln #24.
-authRouter.post(
-  "/forgot-password",
-  authLimiter,
-  validate(forgotPasswordSchema),
-  authController.forgotPassword,
-);
-authRouter.post(
-  "/reset-password",
-  authLimiter,
-  validate(resetPasswordSchema),
-  authController.resetPassword,
-);
+authRouter.post("/forgot-password", validate(forgotPasswordSchema), authController.forgotPassword);
+authRouter.post("/reset-password", validate(resetPasswordSchema), authController.resetPassword);

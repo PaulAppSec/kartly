@@ -7,10 +7,11 @@
 
 **Status legend:** 🔴 pending (not yet introduced) · 🟠 live on `main` (documented + exploit test) · 🟢 fixed on `fix/<slug>` (PR open, fixed test passing)
 
-> **Phase status:** Phase 3 in progress. **23 of 24 live:** #1–#23. Each has a
-> passing exploit test in `server/tests/exploits/` and a saved artifact in
-> `artifacts/`. The dangerous classes are sandboxed to the container per §7
-> (decoys only). Only #24 remains on the secure Phase 2 baseline.
+> **Phase status:** Phase 3 COMPLETE. **24 of 24 live on `main`.** Every vuln has
+> a passing exploit test in `server/tests/exploits/`, a both-outcomes fixed test
+> in `server/tests/fixed/`, and a saved artifact in `artifacts/`. The dangerous
+> classes are sandboxed to the container per §7 (decoys only). Next: Phase 4 —
+> one `fix/<slug>` branch + open PR per class.
 
 ## Matrix
 
@@ -39,7 +40,7 @@
 | 21 | Sensitive data exposure | `GET /api/me` returns `passwordHash` | `fix/data-exposure` | 🟠 live on `main` |
 | 22 | Business logic | checkout: qty/price | `fix/business-logic` | 🟠 live on `main` |
 | 23 | CORS misconfig | API CORS | `fix/cors` | 🟠 live on `main` |
-| 24 | No rate limiting | login, coupon, reset | `fix/rate-limit` | 🔴 pending |
+| 24 | No rate limiting | login, coupon, reset | `fix/rate-limit` | 🟠 live on `main` |
 
 ---
 
@@ -370,4 +371,14 @@ the placeholders below reserve the slot and record the plan.
 - **Fix (`fix/cors`):** strict allowlist — `origin:[env.clientOrigin]`, credentials only for it.
 - **Detect:** reflected `Origin` in `Access-Control-Allow-Origin` alongside credentials; wildcard + credentials.
 - **Exploit test:** `server/tests/exploits/23-cors.test.ts`
-### 24. No rate limiting — 🔴 pending
+### 24. No rate limiting — 🟠 live on `main`
+- **Where:** `server/src/routes/auth.ts` (login/register/reset) and `server/src/routes/orders.ts` (checkout/coupon).
+- **Vulnerable code:** `authLimiter` and `couponLimiter` were removed from the sensitive routes (the limiters still exist in `middleware/rateLimit.ts`, just unwired).
+- **Exploit (copy-paste):**
+  ```
+  POST /api/auth/login × 15 (bad creds)  → 15/15 accepted, no 429
+  ```
+- **Impact:** Unthrottled brute force, credential stuffing, coupon brute force, and reset spraying.
+- **Fix (`fix/rate-limit`):** reinstate `authLimiter` on login/register/reset and `couponLimiter` on checkout; add backoff/lockout.
+- **Detect:** sensitive endpoints with no limiter; high failed-login volume from one IP without 429s.
+- **Exploit test:** `server/tests/exploits/24-rate-limit.test.ts`

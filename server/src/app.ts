@@ -11,6 +11,7 @@ import { loadOpenApi } from "./lib/openapi.js";
 import { apiLimiter } from "./middleware/rateLimit.js";
 import { errorHandler } from "./middleware/errorHandler.js";
 import { apiNotFound } from "./middleware/notFound.js";
+import { adminApiRouter } from "./routes/adminApi.js";
 import { adminRouter } from "./routes/admin.js";
 import { authRouter } from "./routes/auth.js";
 import { healthRouter } from "./routes/health.js";
@@ -81,6 +82,7 @@ export function createApp() {
   app.use("/api/messages", messagesRouter);
   app.use("/api/orders", ordersRouter);
   app.use("/api/seller", sellerRouter);
+  app.use("/api/admin", adminApiRouter);
 
   // ── Live API docs
   app.use("/api/docs", swaggerUi.serve, swaggerUi.setup(loadOpenApi() as object));

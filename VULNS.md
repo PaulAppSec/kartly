@@ -7,10 +7,10 @@
 
 **Status legend:** 🔴 pending (not yet introduced) · 🟠 live on `main` (documented + exploit test) · 🟢 fixed on `fix/<slug>` (PR open, fixed test passing)
 
-> **Phase status:** Phase 3 in progress. **5 of 24 live:** #1 SQLi (UNION), #2
-> SQLi (auth bypass), #3 blind SQLi, #4 broken auth, #5 IDOR. Each has a passing
-> exploit test in `server/tests/exploits/` and a saved artifact in `artifacts/`.
-> The rest are still the secure Phase 2 baseline.
+> **Phase status:** Phase 3 in progress. **6 of 24 live:** #1 SQLi (UNION), #2
+> SQLi (auth bypass), #3 blind SQLi, #4 broken auth, #5 IDOR, #6 privilege
+> escalation. Each has a passing exploit test in `server/tests/exploits/` and a
+> saved artifact in `artifacts/`. The rest are still the secure Phase 2 baseline.
 
 ## Matrix
 
@@ -21,7 +21,7 @@
 | 3 | Blind SQLi (boolean/time) | `GET /api/products?sort=` | `fix/blind-sqli` | 🟠 live on `main` |
 | 4 | Broken auth | login / register / seed | `fix/auth` | 🟠 live on `main` |
 | 5 | Broken access control (IDOR) | `GET /api/orders/:id`, `/messages/:id` | `fix/idor` | 🟠 live on `main` |
-| 6 | Privilege escalation | `/api/admin/*` | `fix/authz-admin` | 🔴 pending |
+| 6 | Privilege escalation | `/api/admin/*` | `fix/authz-admin` | 🟠 live on `main` |
 | 7 | Mass assignment | `POST /api/register`, `PATCH /api/me` | `fix/mass-assignment` | 🔴 pending |
 | 8 | Stored XSS | reviews, bio, description, messages | `fix/stored-xss` | 🔴 pending |
 | 9 | Reflected XSS | search / server error / share page | `fix/reflected-xss` | 🔴 pending |
@@ -144,7 +144,14 @@ the placeholders below reserve the slot and record the plan.
 - **Fix (`fix/idor`):** object-level authorization — verify ownership, return **404** (not 403) so ids don't leak existence.
 - **Detect:** handlers that fetch by id without an owner predicate; one account reading many distinct ids.
 - **Exploit test:** `server/tests/exploits/05-idor.test.ts`
-### 6. Privilege escalation — 🔴 pending
+### 6. Privilege escalation — 🟠 live on `main`
+- **Where:** `server/src/routes/adminApi.ts` → `/api/admin/*`
+- **Vulnerable code:** router uses `requireAuth` only — no `requireRole('ADMIN')`.
+- **Exploit:** as a CUSTOMER, `GET /api/admin/users` → 200 (full user list); `POST /api/admin/users/u-alice/role {"role":"ADMIN"}` self-promotes.
+- **Impact:** Any authenticated user gains admin capabilities — read all users, change roles, full takeover.
+- **Fix (`fix/authz-admin`):** add `requireRole('ADMIN')` to the admin router (deny by default).
+- **Detect:** admin routes lacking a role check; non-admin principals hitting `/api/admin/*`.
+- **Exploit test:** `server/tests/exploits/06-privesc.test.ts`
 ### 7. Mass assignment — 🔴 pending
 ### 8. Stored XSS — 🔴 pending
 ### 9. Reflected XSS — 🔴 pending

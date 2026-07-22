@@ -1,8 +1,8 @@
 import { addressRepo } from "../data/addressRepo.js";
 import { userRepo } from "../data/userRepo.js";
 import { HttpError } from "../middleware/errorHandler.js";
-import { fetchRemoteImage } from "../lib/urlFetch.js";
-import { saveImageBuffer, saveValidatedImage } from "../lib/upload.js";
+import { fetchUrlUnsafe } from "../lib/urlFetch.js";
+import { saveRawBuffer, saveUnrestrictedUpload } from "../lib/upload.js";
 import type { AddressInput, UpdateMeInput } from "../schemas/userSchemas.js";
 import { toPublicUser } from "./authService.js";
 
@@ -20,13 +20,15 @@ export const userService = {
   },
 
   async setAvatarFromUpload(userId: string, file: Express.Multer.File | undefined) {
-    const url = await saveValidatedImage(file);
+    // #13 unrestricted upload.
+    const url = await saveUnrestrictedUpload(file);
     return toPublicUser(await userRepo.update(userId, { avatarUrl: url }));
   },
 
   async setAvatarFromUrl(userId: string, sourceUrl: string) {
-    const { buffer } = await fetchRemoteImage(sourceUrl);
-    const url = await saveImageBuffer(buffer);
+    // #12 SSRF — raw fetch of a user-supplied URL, response persisted/served.
+    const { buffer } = await fetchUrlUnsafe(sourceUrl);
+    const url = await saveRawBuffer(buffer);
     return toPublicUser(await userRepo.update(userId, { avatarUrl: url }));
   },
 

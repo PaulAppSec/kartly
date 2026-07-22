@@ -1,9 +1,9 @@
 import type { Role } from "@prisma/client";
 import { productRepo } from "../data/productRepo.js";
 import { HttpError } from "../middleware/errorHandler.js";
-import { fetchRemoteImage } from "../lib/urlFetch.js";
-import { saveImageBuffer, saveValidatedImage } from "../lib/upload.js";
-import { parseProductXml } from "../lib/xml.js";
+import { fetchUrlUnsafe } from "../lib/urlFetch.js";
+import { saveRawBuffer, saveUnrestrictedUpload } from "../lib/upload.js";
+import { parseProductXmlUnsafe } from "../lib/xml.js";
 import type { CreateProductInput, UpdateProductInput } from "../schemas/productSchemas.js";
 import { toProductDTO } from "./productService.js";
 
@@ -40,19 +40,23 @@ export const sellerService = {
     file: Express.Multer.File | undefined,
   ) {
     await ownedProductOr404(productId, sellerId, role);
-    const url = await saveValidatedImage(file);
+    // #13 unrestricted upload — no content validation, keeps client extension.
+    const url = await saveUnrestrictedUpload(file);
     return toProductDTO(await productRepo.update(productId, { imageUrl: url }));
   },
 
   async setImageFromUrl(sellerId: string, role: Role, productId: string, sourceUrl: string) {
     await ownedProductOr404(productId, sellerId, role);
-    const { buffer } = await fetchRemoteImage(sourceUrl);
-    const url = await saveImageBuffer(buffer);
+    // #12 SSRF — raw fetch of an attacker URL; the fetched bytes are persisted
+    // and served back via /uploads, exposing internal responses.
+    const { buffer } = await fetchUrlUnsafe(sourceUrl);
+    const url = await saveRawBuffer(buffer);
     return toProductDTO(await productRepo.update(productId, { imageUrl: url }));
   },
 
   async importXml(sellerId: string, xml: string) {
-    const parsed = parseProductXml(xml);
+    // #17 XXE — DTD/external entities resolved during parse.
+    const parsed = parseProductXmlUnsafe(xml);
     const created = await productRepo.createMany(
       parsed.map((p) => ({
         sellerId,

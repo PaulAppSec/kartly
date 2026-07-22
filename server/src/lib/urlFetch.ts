@@ -46,6 +46,43 @@ async function assertPublicHost(hostname: string): Promise<void> {
   }
 }
 
+// ⚠️ VULNERABLE ON PURPOSE (main) — VULNS.md #12 (SSRF). Fetches the raw user
+// URL with NO host validation, so internal/loopback/link-local targets
+// (127.0.0.1, 169.254.169.254 cloud metadata, DB ports…) are reachable and
+// their responses are returned to the caller. Sandboxed to the container per §7
+// — no real cloud metadata or outbound egress is wired. The fix (fix/ssrf)
+// switches callers back to fetchRemoteImage (the allowlisted version above).
+export async function fetchUrlUnsafe(
+  rawUrl: string,
+): Promise<{ buffer: Buffer; contentType: string; status: number }> {
+  let url: URL;
+  try {
+    url = new URL(rawUrl);
+  } catch {
+    throw new HttpError(400, "Invalid URL.");
+  }
+  if (url.protocol !== "http:" && url.protocol !== "https:") {
+    throw new HttpError(400, "Only http and https URLs are allowed.");
+  }
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
+  try {
+    // No assertPublicHost(), no content-type gate — the whole point of the vuln.
+    const res = await fetch(url, { signal: controller.signal });
+    const buffer = Buffer.from(await res.arrayBuffer());
+    return {
+      buffer,
+      contentType: res.headers.get("content-type") ?? "application/octet-stream",
+      status: res.status,
+    };
+  } catch (err) {
+    if (err instanceof HttpError) throw err;
+    throw new HttpError(400, "Could not fetch that URL.");
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 export async function fetchRemoteImage(rawUrl: string): Promise<{ buffer: Buffer; contentType: string }> {
   let url: URL;
   try {

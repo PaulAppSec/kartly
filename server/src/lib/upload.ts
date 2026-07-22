@@ -37,3 +37,30 @@ export async function saveValidatedImage(file: Express.Multer.File | undefined):
   if (!file) throw new HttpError(400, "No image file provided.");
   return saveImageBuffer(file.buffer);
 }
+
+function sanitizeExt(raw: string): string {
+  return raw.replace(/[^a-z0-9]/gi, "").slice(0, 8).toLowerCase() || "bin";
+}
+
+// ⚠️ VULNERABLE ON PURPOSE (main) — VULNS.md #13 (Unrestricted upload). No magic-
+// byte / MIME / content validation; the CLIENT-supplied extension is preserved
+// and the file is written into the web-readable uploads dir. An attacker can
+// upload .html/SVG-with-script and have it served as active content. The fix
+// (fix/upload) routes callers back to saveValidatedImage.
+export async function saveUnrestrictedUpload(file: Express.Multer.File | undefined): Promise<string> {
+  if (!file) throw new HttpError(400, "No file provided.");
+  const dot = file.originalname.lastIndexOf(".");
+  const ext = dot >= 0 ? sanitizeExt(file.originalname.slice(dot + 1)) : "bin";
+  const name = `${randomBytes(8).toString("hex")}.${ext}`;
+  await writeFile(join(env.uploadDir, name), file.buffer);
+  return `/uploads/${name}`;
+}
+
+// ⚠️ VULNERABLE ON PURPOSE (main) — used by the SSRF import path (#12) to persist
+// whatever bytes were fetched from a user URL, with no image validation, so the
+// exfiltrated internal response is readable back via /uploads.
+export async function saveRawBuffer(buffer: Buffer, ext = "txt"): Promise<string> {
+  const name = `${randomBytes(8).toString("hex")}.${sanitizeExt(ext)}`;
+  await writeFile(join(env.uploadDir, name), buffer);
+  return `/uploads/${name}`;
+}

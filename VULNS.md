@@ -7,9 +7,11 @@
 
 **Status legend:** 🔴 pending (not yet introduced) · 🟠 live on `main` (documented + exploit test) · 🟢 fixed on `fix/<slug>` (PR open, fixed test passing)
 
-> **Phase status:** Phase 3 in progress. **11 of 24 live:** #1–#10 plus #11 CSRF.
-> Each has a passing exploit test in `server/tests/exploits/` and a saved
-> artifact in `artifacts/`. The rest are still the secure Phase 2 baseline.
+> **Phase status:** Phase 3 in progress. **14 of 24 live:** #1–#11 plus #12 SSRF,
+> #13 unrestricted upload, #17 XXE. Each has a passing exploit test in
+> `server/tests/exploits/` and a saved artifact in `artifacts/`. The remaining
+> dangerous classes are sandboxed to the container per §7 (decoys only). The
+> rest are still the secure Phase 2 baseline.
 
 ## Matrix
 
@@ -26,12 +28,12 @@
 | 9 | Reflected XSS | search / server error / share page | `fix/reflected-xss` | 🟠 live on `main` |
 | 10 | DOM XSS | client renders `location.hash`/param | `fix/dom-xss` | 🟠 live on `main` |
 | 11 | CSRF | `PATCH /api/me` (profile/email) | `fix/csrf` | 🟠 live on `main` |
-| 12 | SSRF | import-image-from-URL, avatar-from-URL | `fix/ssrf` | 🔴 pending |
-| 13 | Unrestricted file upload | avatar / product image | `fix/upload` | 🔴 pending |
+| 12 | SSRF | import-image-from-URL, avatar-from-URL | `fix/ssrf` | 🟠 live on `main` |
+| 13 | Unrestricted file upload | avatar / product image | `fix/upload` | 🟠 live on `main` |
 | 14 | Path traversal / LFI | `GET /download?file=` | `fix/path-traversal` | 🔴 pending |
 | 15 | Command injection (RCE) | admin export / image processing | `fix/cmdi` | 🔴 pending |
 | 16 | SSTI | seller store-announcement template | `fix/ssti` | 🔴 pending |
-| 17 | XXE | bulk XML product import | `fix/xxe` | 🔴 pending |
+| 17 | XXE | bulk XML product import | `fix/xxe` | 🟠 live on `main` |
 | 18 | Open redirect | `GET /login?returnTo=` | `fix/open-redirect` | 🔴 pending |
 | 19 | JWT weaknesses | API auth | `fix/jwt` | 🔴 pending |
 | 20 | Security misconfig | verbose errors, `/.env`, debug route | `fix/misconfig` | 🔴 pending |
@@ -214,12 +216,51 @@ the placeholders below reserve the slot and record the plan.
 - **Fix (`fix/csrf`):** restore `csrfGuard` (double-submit token) on all cookie-authed state-changing routes; keep `SameSite`.
 - **Detect:** state-changing route with no CSRF/token check; writes lacking the `X-CSRF-Token` header succeeding.
 - **Exploit test:** `server/tests/exploits/11-csrf.test.ts`
-### 12. SSRF — 🔴 pending
-### 13. Unrestricted file upload — 🔴 pending
+### 12. SSRF — 🟠 live on `main`
+- **Where:** `server/src/services/userService.ts` (`setAvatarFromUrl`), `sellerService.ts` (`setImageFromUrl`) → `POST /api/me/avatar-url`, `POST /api/seller/products/:id/import-url`. Vulnerable fetch in `server/src/lib/urlFetch.ts` (`fetchUrlUnsafe`).
+- **Vulnerable code:** `fetchUrlUnsafe` fetches the raw URL with **no** host validation (no private/loopback/link-local block); the bytes are saved via `saveRawBuffer` and served from `/uploads`.
+- **Exploit (copy-paste):**
+  ```
+  POST /api/me/avatar-url { "url": "http://127.0.0.1:4000/api/health" }   → response saved to /uploads/<hex>.txt
+  GET  /uploads/<hex>.txt                                                 → {"status":"ok","db":"up",…}
+  ```
+  Real-world target: `http://169.254.169.254/latest/meta-data/…` (cloud metadata) or internal admin/DB ports.
+- **Impact:** Read internal-only services / cloud metadata; pivot into the internal network from the server's vantage point.
+- **Fix (`fix/ssrf`):** `fetchRemoteImage` — allow only http/https, resolve DNS and block private/loopback/link-local ranges, cap size/time, require an image content-type.
+- **Detect:** server-side `fetch()` of user input with no egress allowlist; outbound requests to RFC1918 / 169.254.169.254.
+- **Sandbox (§7):** container-only; no real cloud metadata or outbound egress is wired; demo hits loopback.
+- **Exploit test:** `server/tests/exploits/12-ssrf.test.ts`
+
+### 13. Unrestricted file upload — 🟠 live on `main`
+- **Where:** `server/src/lib/upload.ts` (`saveUnrestrictedUpload`), used by `userService.setAvatarFromUpload` / `sellerService.setImageFromUpload` → `POST /api/me/avatar`, `POST /api/seller/products/:id/image`.
+- **Vulnerable code:** no magic-byte/MIME/content check; the client extension is preserved and the file lands in the web-readable uploads dir.
+- **Exploit (copy-paste):**
+  ```
+  POST /api/me/avatar  (multipart)  filename=pwn.html  Content-Type=text/html
+    body = <script>alert(document.domain)</script>
+  → /uploads/<hex>.html  served as text/html
+  ```
+- **Impact:** Stored XSS / phishing page hosted on the trusted origin; with a permissive server, potential webshell.
+- **Fix (`fix/upload`):** `saveValidatedImage` — verify by magic bytes (not MIME/extension), randomize the name, force a safe extension, serve from a non-executable dir.
+- **Detect:** uploads trusting client MIME/extension; non-image bytes in the image store; active content types under `/uploads`.
+- **Exploit test:** `server/tests/exploits/13-upload.test.ts`
 ### 14. Path traversal / LFI — 🔴 pending
 ### 15. Command injection (RCE) — 🔴 pending
 ### 16. SSTI — 🔴 pending
-### 17. XXE — 🔴 pending
+### 17. XXE — 🟠 live on `main`
+- **Where:** `server/src/lib/xml.ts` (`parseProductXmlUnsafe`), used by `sellerService.importXml` → `POST /api/seller/products/import-xml`.
+- **Vulnerable code:** DTDs are allowed and external `SYSTEM` entities are resolved off disk, then substituted into the document.
+- **Exploit (copy-paste):**
+  ```xml
+  <!DOCTYPE products [<!ENTITY xxe SYSTEM "file:///app/server/decoys/secret.txt">]>
+  <products><product><name>&xxe;</name><description>x</description><price>1</price><stock>1</stock></product></products>
+  ```
+  The imported product's `name` is populated with the file contents.
+- **Impact:** Arbitrary file read (config, keys), SSRF via `http://` entities, and DoS (billion laughs).
+- **Fix (`fix/xxe`):** `parseProductXml` — disable DTD/entity processing and reject any `<!DOCTYPE>`/`<!ENTITY>`.
+- **Detect:** XML parser with entity/DTD resolution enabled; imports containing `<!ENTITY … SYSTEM …>`.
+- **Sandbox (§7):** demo reads a planted decoy (`server/decoys/secret.txt`); container-only.
+- **Exploit test:** `server/tests/exploits/17-xxe.test.ts`
 ### 18. Open redirect — 🔴 pending
 ### 19. JWT weaknesses — 🔴 pending
 ### 20. Security misconfig — 🔴 pending

@@ -7,11 +7,11 @@
 
 **Status legend:** 🔴 pending (not yet introduced) · 🟠 live on `main` (documented + exploit test) · 🟢 fixed on `fix/<slug>` (PR open, fixed test passing)
 
-> **Phase status:** Phase 3 in progress. **14 of 24 live:** #1–#11 plus #12 SSRF,
-> #13 unrestricted upload, #17 XXE. Each has a passing exploit test in
-> `server/tests/exploits/` and a saved artifact in `artifacts/`. The remaining
-> dangerous classes are sandboxed to the container per §7 (decoys only). The
-> rest are still the secure Phase 2 baseline.
+> **Phase status:** Phase 3 in progress. **16 of 24 live:** #1–#13, #17 plus #14
+> path traversal, #16 SSTI. Each has a passing exploit test in
+> `server/tests/exploits/` and a saved artifact in `artifacts/`. The dangerous
+> classes are sandboxed to the container per §7 (decoys only). The rest are still
+> the secure Phase 2 baseline.
 
 ## Matrix
 
@@ -30,9 +30,9 @@
 | 11 | CSRF | `PATCH /api/me` (profile/email) | `fix/csrf` | 🟠 live on `main` |
 | 12 | SSRF | import-image-from-URL, avatar-from-URL | `fix/ssrf` | 🟠 live on `main` |
 | 13 | Unrestricted file upload | avatar / product image | `fix/upload` | 🟠 live on `main` |
-| 14 | Path traversal / LFI | `GET /download?file=` | `fix/path-traversal` | 🔴 pending |
+| 14 | Path traversal / LFI | `GET /download?file=` | `fix/path-traversal` | 🟠 live on `main` |
 | 15 | Command injection (RCE) | admin export / image processing | `fix/cmdi` | 🔴 pending |
-| 16 | SSTI | seller store-announcement template | `fix/ssti` | 🔴 pending |
+| 16 | SSTI | seller store-announcement template | `fix/ssti` | 🟠 live on `main` |
 | 17 | XXE | bulk XML product import | `fix/xxe` | 🟠 live on `main` |
 | 18 | Open redirect | `GET /login?returnTo=` | `fix/open-redirect` | 🔴 pending |
 | 19 | JWT weaknesses | API auth | `fix/jwt` | 🔴 pending |
@@ -244,9 +244,32 @@ the placeholders below reserve the slot and record the plan.
 - **Fix (`fix/upload`):** `saveValidatedImage` — verify by magic bytes (not MIME/extension), randomize the name, force a safe extension, serve from a non-executable dir.
 - **Detect:** uploads trusting client MIME/extension; non-image bytes in the image store; active content types under `/uploads`.
 - **Exploit test:** `server/tests/exploits/13-upload.test.ts`
-### 14. Path traversal / LFI — 🔴 pending
+### 14. Path traversal / LFI — 🟠 live on `main`
+- **Where:** `server/src/controllers/pageController.ts` (`download`) → `GET /download?file=`.
+- **Vulnerable code:** `const target = join(DOWNLOADS_DIR, file)` — the user filename is joined with no confinement, so `..` escapes the base.
+- **Exploit (copy-paste):**
+  ```
+  GET /download?file=../decoys/secret.txt   → returns the file outside downloads/
+  ```
+- **Impact:** Read arbitrary files the process can access (config, keys, source).
+- **Fix (`fix/path-traversal`):** `resolveWithinBase` — resolve the joined path and confirm it still sits inside the base dir.
+- **Detect:** `path.join(base, userInput)` served without a containment check; `..`/encoded traversal in `file=`.
+- **Sandbox (§7):** demo reads a planted decoy; container-only.
+- **Exploit test:** `server/tests/exploits/14-path-traversal.test.ts`
 ### 15. Command injection (RCE) — 🔴 pending
-### 16. SSTI — 🔴 pending
+### 16. SSTI — 🟠 live on `main`
+- **Where:** `server/src/controllers/pageController.ts` (`store`) compiles the announcement; `server/src/views/store.ejs` emits it raw → `GET /store/:sellerId`.
+- **Vulnerable code:** `ejs.render(template, {})` — the seller-supplied announcement string is compiled as a template instead of rendered as data.
+- **Exploit (copy-paste):**
+  ```
+  announcement = math=<%= 7*7 %> secret=<%= process.env.JWT_ACCESS_SECRET %>
+  GET /store/u-seller  → "math=49 secret=dev-access-secret-change-me"
+  ```
+  Escalates to RCE via `<%- process.mainModule.require('child_process').execSync('id') %>`.
+- **Impact:** Server secret disclosure and remote code execution in the app process.
+- **Fix (`fix/ssti`):** never compile user input — render the announcement as escaped **data** (`<%= announcement %>`).
+- **Detect:** user strings passed to a template compiler/`eval`; `<%`/`{{ }}` payloads surviving into rendered output.
+- **Exploit test:** `server/tests/exploits/16-ssti.test.ts`
 ### 17. XXE — 🟠 live on `main`
 - **Where:** `server/src/lib/xml.ts` (`parseProductXmlUnsafe`), used by `sellerService.importXml` → `POST /api/seller/products/import-xml`.
 - **Vulnerable code:** DTDs are allowed and external `SYSTEM` entities are resolved off disk, then substituted into the document.

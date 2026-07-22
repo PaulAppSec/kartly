@@ -1,4 +1,5 @@
-import { resolve } from "node:path";
+import { join, resolve } from "node:path";
+import ejs from "ejs";
 import type { NextFunction, Request, Response } from "express";
 import { announcementService } from "../services/announcementService.js";
 import { orderService } from "../services/orderService.js";
@@ -7,7 +8,6 @@ import { reviewService } from "../services/reviewService.js";
 import { sellerService } from "../services/sellerService.js";
 import { userRepo } from "../data/userRepo.js";
 import { HttpError } from "../middleware/errorHandler.js";
-import { resolveWithinBase } from "../lib/safePath.js";
 
 const DOWNLOADS_DIR = resolve(process.cwd(), "server/downloads");
 const money = (n: number) => `$${n.toFixed(2)}`;
@@ -65,9 +65,20 @@ export const pageController = {
         announcementService.get(seller.id),
         sellerService.listMine(seller.id),
       ]);
+      const template = announcement?.template ?? "Welcome to our store!";
+      // ⚠️ VULNERABLE ON PURPOSE (main) — VULNS.md #16 (SSTI). The seller-supplied
+      // announcement is COMPILED as an EJS template instead of rendered as data,
+      // so `<%= 7*7 %>` evaluates and `<%= process.env… %>` / require() give
+      // secret disclosure → RCE. The fix (fix/ssti) renders it as escaped data.
+      let announcementHtml: string;
+      try {
+        announcementHtml = ejs.render(template, {});
+      } catch {
+        announcementHtml = template;
+      }
       res.render("store", {
         seller: { id: seller.id, name: seller.name },
-        announcement: announcement?.template ?? "Welcome to our store!",
+        announcement: announcementHtml,
         products,
         money,
       });
@@ -76,12 +87,16 @@ export const pageController = {
     }
   },
 
-  // File download, confined to the downloads directory (path-traversal safe #14).
+  // ⚠️ VULNERABLE ON PURPOSE (main) — VULNS.md #14 (Path traversal / LFI). The
+  // user filename is joined onto the base dir with no confinement, so
+  // `?file=../decoys/secret.txt` escapes the downloads directory. Sandboxed per
+  // §7 — demos read a planted decoy, not real host secrets. The fix
+  // (fix/path-traversal) restores resolveWithinBase().
   download(req: Request, res: Response, next: NextFunction) {
     try {
       const file = typeof req.query.file === "string" ? req.query.file : "";
       if (!file) throw new HttpError(400, "Specify a file.");
-      const target = resolveWithinBase(DOWNLOADS_DIR, file);
+      const target = join(DOWNLOADS_DIR, file);
       res.download(target, (err) => {
         if (err && !res.headersSent) next(new HttpError(404, "File not found."));
       });

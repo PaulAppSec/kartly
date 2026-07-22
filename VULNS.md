@@ -7,9 +7,8 @@
 
 **Status legend:** 🔴 pending (not yet introduced) · 🟠 live on `main` (documented + exploit test) · 🟢 fixed on `fix/<slug>` (PR open, fixed test passing)
 
-> **Phase status:** Phase 3 in progress. **7 of 24 live:** #1 SQLi (UNION), #2
-> SQLi (auth bypass), #3 blind SQLi, #4 broken auth, #5 IDOR, #6 privilege
-> escalation, #7 mass assignment. Each has a passing exploit test in
+> **Phase status:** Phase 3 in progress. **10 of 24 live:** #1–#7 plus #8 stored
+> XSS, #9 reflected XSS, #10 DOM XSS. Each has a passing exploit test in
 > `server/tests/exploits/` and a saved artifact in `artifacts/`. The rest are
 > still the secure Phase 2 baseline.
 
@@ -24,9 +23,9 @@
 | 5 | Broken access control (IDOR) | `GET /api/orders/:id`, `/messages/:id` | `fix/idor` | 🟠 live on `main` |
 | 6 | Privilege escalation | `/api/admin/*` | `fix/authz-admin` | 🟠 live on `main` |
 | 7 | Mass assignment | `POST /api/auth/register` | `fix/mass-assignment` | 🟠 live on `main` |
-| 8 | Stored XSS | reviews, bio, description, messages | `fix/stored-xss` | 🔴 pending |
-| 9 | Reflected XSS | search / server error / share page | `fix/reflected-xss` | 🔴 pending |
-| 10 | DOM XSS | client renders `location.hash`/param | `fix/dom-xss` | 🔴 pending |
+| 8 | Stored XSS | reviews, bio, description, messages | `fix/stored-xss` | 🟠 live on `main` |
+| 9 | Reflected XSS | search / server error / share page | `fix/reflected-xss` | 🟠 live on `main` |
+| 10 | DOM XSS | client renders `location.hash`/param | `fix/dom-xss` | 🟠 live on `main` |
 | 11 | CSRF | `POST /account/email`, place order | `fix/csrf` | 🔴 pending |
 | 12 | SSRF | import-image-from-URL, avatar-from-URL | `fix/ssrf` | 🔴 pending |
 | 13 | Unrestricted file upload | avatar / product image | `fix/upload` | 🔴 pending |
@@ -167,9 +166,47 @@ the placeholders below reserve the slot and record the plan.
 - **Fix (`fix/mass-assignment`):** drop `.passthrough()` and construct the create from an explicit field allowlist (Zod `.pick`), never spreading the body.
 - **Detect:** `{...req.body}` into ORM create/update; a signup setting a privileged field.
 - **Exploit test:** `server/tests/exploits/07-mass-assignment.test.ts`
-### 8. Stored XSS — 🔴 pending
-### 9. Reflected XSS — 🔴 pending
-### 10. DOM XSS — 🔴 pending
+### 8. Stored XSS — 🟠 live on `main`
+- **Where:** `server/src/views/share.ejs` (renders `product.description` and each `review.body` with `<%- %>`), fed by `pageController.shareProduct` → `GET /share/product/:id`
+- **Vulnerable code:** `<p class="muted"><%- r.body %></p>` — raw HTML output of user-supplied review text.
+- **Exploit (copy-paste):**
+  ```
+  POST /api/products/p01/reviews  { "body": "<img src=x onerror=alert(document.domain)>", "rating": 5 }
+  GET  /share/product/p01         → the <img onerror> is served raw
+  ```
+- **Impact:** Persistent XSS running for every visitor of a public page — session/cookie theft, drive-by actions as the victim.
+- **Fix (`fix/stored-xss`):** escape on output (`<%= %>`) / sanitize with DOMPurify; strict CSP as defense-in-depth.
+- **Detect:** `<%-` on user-controlled data; scanner sees the stored payload reflected; CSP-violation reports.
+- **Exploit test:** `server/tests/exploits/08-stored-xss.test.ts`
+
+### 9. Reflected XSS — 🟠 live on `main`
+- **Where:** `server/src/views/share.ejs` → `GET /share/product/:id?q=`
+- **Vulnerable code:** `Results for "<%- q %>"` — the search term echoed as raw HTML.
+- **Exploit (copy-paste):**
+  ```
+  GET /share/product/p01?q=<script>alert(1337)</script>   → script runs
+  ```
+- **Impact:** A crafted link executes attacker JS under the Kartly origin (phishing, token theft).
+- **Fix (`fix/reflected-xss`):** contextual escaping (`<%= q %>`).
+- **Detect:** reflected input in the response verbatim; `<%-` on request params.
+- **Exploit test:** `server/tests/exploits/09-reflected-xss.test.ts`
+
+### 10. DOM XSS — 🟠 live on `main`
+- **Where:** `server/src/views/share.ejs` inline script → assigns the URL fragment via `innerHTML`.
+- **Vulnerable code:**
+  ```js
+  var note = decodeURIComponent(location.hash.slice(1));
+  if (note) document.getElementById("kartly-share-note").innerHTML = note;
+  ```
+- **Exploit (copy-paste):**
+  ```
+  https://…/share/product/p01#<img src=x onerror=alert(document.cookie)>
+  ```
+  The fragment never leaves the browser, so server-side filtering can't see it.
+- **Impact:** Client-side XSS driven entirely by the URL fragment; same blast radius as reflected XSS but invisible to server logs/WAF.
+- **Fix (`fix/dom-xss`):** write to `textContent` (inert sink); never pass untrusted data to `innerHTML`.
+- **Detect:** `innerHTML`/`document.write` fed by `location.*`; DOM-XSS scanners; code review of client sinks.
+- **Exploit test:** `server/tests/exploits/10-dom-xss.test.ts`
 ### 11. CSRF — 🔴 pending
 ### 12. SSRF — 🔴 pending
 ### 13. Unrestricted file upload — 🔴 pending

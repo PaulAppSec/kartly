@@ -9,8 +9,11 @@
 <body>
   <div class="wrap" style="max-width:680px;">
     <div class="brand"><span class="g">K</span> Kartly</div>
+    <%# VULNERABLE ON PURPOSE (main) — VULNS.md #9 (Reflected XSS): the search
+        term is emitted as raw HTML below, so ?q=(script) executes. The fix
+        switches back to contextual HTML escaping. %>
     <% if (q) { %>
-      <p class="muted" style="margin-top:16px;">Results for “<%= q %>”</p>
+      <p class="muted" style="margin-top:16px;">Results for “<%- q %>”</p>
     <% } %>
     <div class="card" style="margin-top:24px; overflow:hidden; padding:0;">
       <% if (product.imageUrl) { %>
@@ -19,14 +22,43 @@
       <div style="padding:28px;">
         <span class="tag"><%= product.category %></span>
         <h1 style="margin-top:12px;"><%= product.name %></h1>
-        <p class="muted"><%= product.description %></p>
+        <%# VULNERABLE ON PURPOSE (main) — VULNS.md #8 (Stored XSS): seller-
+            controlled description rendered as raw HTML. Fix escapes/sanitizes. %>
+        <p class="muted"><%- product.description %></p>
         <div class="row" style="margin-top:16px;">
           <span class="total"><%= money(product.price) %></span>
           <a class="btn" href="/">Shop on Kartly</a>
         </div>
       </div>
     </div>
+
+    <%# DOM XSS demo surface (VULNS.md #10) — populated by the script below. %>
+    <div id="kartly-share-note" class="muted" style="text-align:center; margin-top:16px;"></div>
+
+    <% if (reviews && reviews.length) { %>
+      <h3 style="margin-top:28px;">What shoppers say</h3>
+      <% reviews.forEach(function(r){ %>
+        <div class="card" style="margin-top:12px;">
+          <div class="row"><strong><%= r.author.name %></strong><span class="tag"><%= r.rating %>★</span></div>
+          <%# VULNERABLE ON PURPOSE (main) — VULNS.md #8 (Stored XSS): any
+              shopper's review body is rendered as raw HTML on this public page. %>
+          <p class="muted" style="margin-top:8px;"><%- r.body %></p>
+        </div>
+      <% }) %>
+    <% } %>
+
     <p class="muted" style="text-align:center; margin-top:20px;">Shared from Kartly — the modern local marketplace.</p>
   </div>
+
+  <%# ⚠️ VULNERABLE ON PURPOSE (main) — VULNS.md #10 (DOM XSS). A "personalized
+      note" is read from the URL fragment and assigned via innerHTML, so
+      #<img src=x onerror=alert(document.cookie)> runs in the victim's browser.
+      Fix (fix/dom-xss) uses textContent (an inert sink). %>
+  <script>
+    (function () {
+      var note = decodeURIComponent((location.hash || "").slice(1));
+      if (note) document.getElementById("kartly-share-note").innerHTML = note;
+    })();
+  </script>
 </body>
 </html>

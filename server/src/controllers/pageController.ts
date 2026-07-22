@@ -3,6 +3,7 @@ import type { NextFunction, Request, Response } from "express";
 import { announcementService } from "../services/announcementService.js";
 import { orderService } from "../services/orderService.js";
 import { productService } from "../services/productService.js";
+import { reviewService } from "../services/reviewService.js";
 import { sellerService } from "../services/sellerService.js";
 import { userRepo } from "../data/userRepo.js";
 import { HttpError } from "../middleware/errorHandler.js";
@@ -40,13 +41,15 @@ export const pageController = {
     }
   },
 
-  // Public product share page. EJS <%= %> escapes output → XSS-safe baseline
-  // (reflected/stored XSS lessons #8/#9 render raw HTML in Phase 3).
+  // Public product share page. On `main` this template renders the search term
+  // (#9), the product description and shopper reviews (#8), and a fragment-based
+  // note (#10) as raw HTML — the reflected/stored/DOM XSS lessons.
   async shareProduct(req: Request, res: Response, next: NextFunction) {
     try {
       const product = await productService.getById(req.params.id);
+      const reviews = await reviewService.listForProduct(req.params.id);
       const q = typeof req.query.q === "string" ? req.query.q : "";
-      res.render("share", { product, q, money });
+      res.render("share", { product, reviews, q, money });
     } catch (err) {
       next(err);
     }

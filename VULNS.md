@@ -7,10 +7,10 @@
 
 **Status legend:** 🔴 pending (not yet introduced) · 🟠 live on `main` (documented + exploit test) · 🟢 fixed on `fix/<slug>` (PR open, fixed test passing)
 
-> **Phase status:** Phase 3 in progress. **19 of 24 live:** #1–#19. Each has a
-> passing exploit test in `server/tests/exploits/` and a saved artifact in
+> **Phase status:** Phase 3 in progress. **21 of 24 live:** #1–#20, #23. Each has
+> a passing exploit test in `server/tests/exploits/` and a saved artifact in
 > `artifacts/`. The dangerous classes are sandboxed to the container per §7
-> (decoys only). #20–#24 are still the secure Phase 2 baseline.
+> (decoys only). #21, #22, #24 are still the secure Phase 2 baseline.
 
 ## Matrix
 
@@ -35,10 +35,10 @@
 | 17 | XXE | bulk XML product import | `fix/xxe` | 🟠 live on `main` |
 | 18 | Open redirect | `GET /login?returnTo=` | `fix/open-redirect` | 🟠 live on `main` |
 | 19 | JWT weaknesses | API auth | `fix/jwt` | 🟠 live on `main` |
-| 20 | Security misconfig | verbose errors, `/.env`, debug route | `fix/misconfig` | 🔴 pending |
+| 20 | Security misconfig | verbose errors, `/.env`, debug route | `fix/misconfig` | 🟠 live on `main` |
 | 21 | Sensitive data exposure | API returns `passwordHash`/tokens | `fix/data-exposure` | 🔴 pending |
 | 22 | Business logic | checkout: qty/price/coupon | `fix/business-logic` | 🔴 pending |
-| 23 | CORS misconfig | API CORS | `fix/cors` | 🔴 pending |
+| 23 | CORS misconfig | API CORS | `fix/cors` | 🟠 live on `main` |
 | 24 | No rate limiting | login, coupon, reset | `fix/rate-limit` | 🔴 pending |
 
 ---
@@ -320,8 +320,32 @@ the placeholders below reserve the slot and record the plan.
 - **Fix (`fix/jwt`):** verify with `algorithms:["HS256"]` only, a strong random secret, and enforce `exp`.
 - **Detect:** `jwt.decode` used as if it verified; `algorithms` omitted or containing `none`; tokens with an empty signature accepted.
 - **Exploit test:** `server/tests/exploits/19-jwt.test.ts`
-### 20. Security misconfig — 🔴 pending
+### 20. Security misconfig — 🟠 live on `main`
+- **Where:** `server/src/app.ts` (`/api/debug`, `/api/debug/error`, `/.env`, `helmet({contentSecurityPolicy:false})`) and `server/src/middleware/errorHandler.ts` (verbose 500s).
+- **Vulnerable code:** the error handler returns `err.message` + `err.stack` to the client on 500; `/.env` and `/api/debug` dump the process environment; CSP is disabled.
+- **Exploit (copy-paste):**
+  ```
+  GET /.env               → JWT_ACCESS_SECRET=dev-access-secret-change-me
+  GET /api/debug          → full process.env
+  GET /api/debug/error    → 500 with a raw stack trace
+  ```
+- **Impact:** Direct secret disclosure (signing keys, DB creds) and internal-path/version leakage; disabled CSP lets the XSS/upload lessons execute.
+- **Fix (`fix/misconfig`):** remove debug/.env routes, generic error responses (log server-side only), restore a strict CSP and the rest of the hardening.
+- **Detect:** stack traces / env in responses; debug or dotfile routes reachable; missing/`false` CSP.
+- **Exploit test:** `server/tests/exploits/20-misconfig.test.ts`
 ### 21. Sensitive data exposure — 🔴 pending
 ### 22. Business logic — 🔴 pending
-### 23. CORS misconfig — 🔴 pending
+### 23. CORS misconfig — 🟠 live on `main`
+- **Where:** `server/src/app.ts` → `cors({ origin: true, credentials: true })`.
+- **Vulnerable code:** `origin:true` reflects any request Origin and `credentials:true` allows cookies.
+- **Exploit (copy-paste):**
+  ```
+  Request Origin: https://evil.example
+  Response: Access-Control-Allow-Origin: https://evil.example
+            Access-Control-Allow-Credentials: true
+  ```
+- **Impact:** A malicious site can make authenticated cross-origin reads of the victim's account data.
+- **Fix (`fix/cors`):** strict allowlist — `origin:[env.clientOrigin]`, credentials only for it.
+- **Detect:** reflected `Origin` in `Access-Control-Allow-Origin` alongside credentials; wildcard + credentials.
+- **Exploit test:** `server/tests/exploits/23-cors.test.ts`
 ### 24. No rate limiting — 🔴 pending

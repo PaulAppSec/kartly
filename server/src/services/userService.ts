@@ -7,10 +7,14 @@ import type { AddressInput, UpdateMeInput } from "../schemas/userSchemas.js";
 import { toPublicUser } from "./authService.js";
 
 export const userService = {
+  // ⚠️ VULNERABLE ON PURPOSE (main) — VULNS.md #21 (Sensitive data exposure).
+  // Returns the RAW user row (including `passwordHash`, which is #4's plaintext)
+  // instead of the public DTO. The fix (fix/data-exposure) returns
+  // toPublicUser(user) — an explicit field allowlist.
   async getMe(userId: string) {
     const user = await userRepo.findById(userId);
     if (!user) throw new HttpError(404, "User not found.");
-    return toPublicUser(user);
+    return user;
   },
 
   async updateMe(userId: string, input: UpdateMeInput) {

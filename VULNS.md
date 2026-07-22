@@ -7,10 +7,10 @@
 
 **Status legend:** 🔴 pending (not yet introduced) · 🟠 live on `main` (documented + exploit test) · 🟢 fixed on `fix/<slug>` (PR open, fixed test passing)
 
-> **Phase status:** Phase 3 in progress. **21 of 24 live:** #1–#20, #23. Each has
+> **Phase status:** Phase 3 in progress. **22 of 24 live:** #1–#21, #23. Each has
 > a passing exploit test in `server/tests/exploits/` and a saved artifact in
 > `artifacts/`. The dangerous classes are sandboxed to the container per §7
-> (decoys only). #21, #22, #24 are still the secure Phase 2 baseline.
+> (decoys only). #22 and #24 are still the secure Phase 2 baseline.
 
 ## Matrix
 
@@ -36,7 +36,7 @@
 | 18 | Open redirect | `GET /login?returnTo=` | `fix/open-redirect` | 🟠 live on `main` |
 | 19 | JWT weaknesses | API auth | `fix/jwt` | 🟠 live on `main` |
 | 20 | Security misconfig | verbose errors, `/.env`, debug route | `fix/misconfig` | 🟠 live on `main` |
-| 21 | Sensitive data exposure | API returns `passwordHash`/tokens | `fix/data-exposure` | 🔴 pending |
+| 21 | Sensitive data exposure | `GET /api/me` returns `passwordHash` | `fix/data-exposure` | 🟠 live on `main` |
 | 22 | Business logic | checkout: qty/price/coupon | `fix/business-logic` | 🔴 pending |
 | 23 | CORS misconfig | API CORS | `fix/cors` | 🟠 live on `main` |
 | 24 | No rate limiting | login, coupon, reset | `fix/rate-limit` | 🔴 pending |
@@ -333,7 +333,18 @@ the placeholders below reserve the slot and record the plan.
 - **Fix (`fix/misconfig`):** remove debug/.env routes, generic error responses (log server-side only), restore a strict CSP and the rest of the hardening.
 - **Detect:** stack traces / env in responses; debug or dotfile routes reachable; missing/`false` CSP.
 - **Exploit test:** `server/tests/exploits/20-misconfig.test.ts`
-### 21. Sensitive data exposure — 🔴 pending
+### 21. Sensitive data exposure — 🟠 live on `main`
+- **Where:** `server/src/services/userService.ts` (`getMe`) → `GET /api/me`.
+- **Vulnerable code:** returns the raw Prisma `user` row instead of `toPublicUser(user)`, so `passwordHash` (and any other columns) ship to the client.
+- **Exploit (copy-paste):**
+  ```
+  GET /api/me  → { "user": { …, "passwordHash": "alice1234" } }
+  ```
+  (Plaintext because of #4 — the API hands back the actual password.)
+- **Impact:** Credential/PII disclosure through an over-broad serializer; trivial account takeover.
+- **Fix (`fix/data-exposure`):** return an explicit DTO (`toPublicUser`) — never serialize the raw row.
+- **Detect:** responses containing `passwordHash`/tokens; ORM rows returned directly from controllers.
+- **Exploit test:** `server/tests/exploits/21-data-exposure.test.ts`
 ### 22. Business logic — 🔴 pending
 ### 23. CORS misconfig — 🟠 live on `main`
 - **Where:** `server/src/app.ts` → `cors({ origin: true, credentials: true })`.

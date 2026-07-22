@@ -10,3 +10,5 @@ adminApiRouter.use(requireAuth); // <-- fix/authz-admin adds requireRole("ADMIN"
 
 adminApiRouter.get("/users", adminApiController.listUsers);
 adminApiRouter.post("/users/:id/role", adminApiController.setRole);
+// #15 command injection lives in the report exporter.
+adminApiRouter.post("/export", adminApiController.exportReport);

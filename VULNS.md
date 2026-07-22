@@ -7,11 +7,10 @@
 
 **Status legend:** 🔴 pending (not yet introduced) · 🟠 live on `main` (documented + exploit test) · 🟢 fixed on `fix/<slug>` (PR open, fixed test passing)
 
-> **Phase status:** Phase 3 in progress. **16 of 24 live:** #1–#13, #17 plus #14
-> path traversal, #16 SSTI. Each has a passing exploit test in
-> `server/tests/exploits/` and a saved artifact in `artifacts/`. The dangerous
-> classes are sandboxed to the container per §7 (decoys only). The rest are still
-> the secure Phase 2 baseline.
+> **Phase status:** Phase 3 in progress. **17 of 24 live:** #1–#17. Each has a
+> passing exploit test in `server/tests/exploits/` and a saved artifact in
+> `artifacts/`. The dangerous classes are sandboxed to the container per §7
+> (decoys only). #18–#24 are still the secure Phase 2 baseline.
 
 ## Matrix
 
@@ -31,7 +30,7 @@
 | 12 | SSRF | import-image-from-URL, avatar-from-URL | `fix/ssrf` | 🟠 live on `main` |
 | 13 | Unrestricted file upload | avatar / product image | `fix/upload` | 🟠 live on `main` |
 | 14 | Path traversal / LFI | `GET /download?file=` | `fix/path-traversal` | 🟠 live on `main` |
-| 15 | Command injection (RCE) | admin export / image processing | `fix/cmdi` | 🔴 pending |
+| 15 | Command injection (RCE) | admin export (`POST /api/admin/export`) | `fix/cmdi` | 🟠 live on `main` |
 | 16 | SSTI | seller store-announcement template | `fix/ssti` | 🟠 live on `main` |
 | 17 | XXE | bulk XML product import | `fix/xxe` | 🟠 live on `main` |
 | 18 | Open redirect | `GET /login?returnTo=` | `fix/open-redirect` | 🔴 pending |
@@ -256,7 +255,19 @@ the placeholders below reserve the slot and record the plan.
 - **Detect:** `path.join(base, userInput)` served without a containment check; `..`/encoded traversal in `file=`.
 - **Sandbox (§7):** demo reads a planted decoy; container-only.
 - **Exploit test:** `server/tests/exploits/14-path-traversal.test.ts`
-### 15. Command injection (RCE) — 🔴 pending
+### 15. Command injection (RCE) — 🟠 live on `main`
+- **Where:** `server/src/controllers/adminApiController.ts` (`exportReport`) → `POST /api/admin/export`.
+- **Vulnerable code:** `pexec(\`echo Kartly export ${label} && ls server/downloads | wc -l\`)` — the user `label` is concatenated into a shell command run via `child_process.exec`.
+- **Exploit (copy-paste):**
+  ```
+  POST /api/admin/export { "label": "sales; cat server/decoys/secret.txt" }
+  → output includes the decoy file contents (FLAG…)
+  ```
+- **Impact:** Arbitrary command execution as the app user — full host (container) compromise.
+- **Fix (`fix/cmdi`):** `execFile("echo", [label])` — no shell, argument array, allowlisted binary; never string-concatenate into a shell.
+- **Detect:** `exec()`/`sh -c` with interpolated input; shell metacharacters (`;`, `|`, `` ` ``, `$(`) in a parameter that reaches a command.
+- **Sandbox (§7):** targets harmless bundled binaries (`echo`/`ls`) + a decoy file; container-only.
+- **Exploit test:** `server/tests/exploits/15-cmdi.test.ts`
 ### 16. SSTI — 🟠 live on `main`
 - **Where:** `server/src/controllers/pageController.ts` (`store`) compiles the announcement; `server/src/views/store.ejs` emits it raw → `GET /store/:sellerId`.
 - **Vulnerable code:** `ejs.render(template, {})` — the seller-supplied announcement string is compiled as a template instead of rendered as data.

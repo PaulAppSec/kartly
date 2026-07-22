@@ -1,16 +1,5 @@
-import type { Prisma } from "@prisma/client";
+import type { Prisma, Product } from "@prisma/client";
 import { prisma } from "./prisma.js";
-
-// Allowlisted sort options → concrete Prisma orderBy. This mapping is the
-// defense against ORDER BY injection / blind SQLi (#3): user input never
-// reaches the query as a column name.
-const SORTS: Record<string, Prisma.ProductOrderByWithRelationInput> = {
-  newest: { createdAt: "desc" },
-  oldest: { createdAt: "asc" },
-  price_asc: { price: "asc" },
-  price_desc: { price: "desc" },
-  name: { name: "asc" },
-};
 
 export interface ProductQuery {
   q?: string;
@@ -19,17 +8,18 @@ export interface ProductQuery {
 }
 
 export const productRepo = {
+  // ⚠️ VULNERABLE ON PURPOSE (main) — VULNS.md #3 (blind SQLi).
+  // q and category are parameterized ($1/$2), but the `sort` value is
+  // concatenated straight into the ORDER BY clause, so a boolean/time-based
+  // payload leaks data one bit at a time. Fix (fix/blind-sqli) allowlists
+  // the sort column.
   search({ q, category, sort }: ProductQuery) {
-    const where: Prisma.ProductWhereInput = {};
-    if (q) {
-      where.OR = [
-        { name: { contains: q, mode: "insensitive" } },
-        { description: { contains: q, mode: "insensitive" } },
-      ];
-    }
-    if (category && category !== "All") where.category = category;
-    const orderBy = SORTS[sort ?? "newest"] ?? SORTS.newest;
-    return prisma.product.findMany({ where, orderBy });
+    const orderBy = sort && sort.trim() !== "" ? sort : '"createdAt" DESC';
+    const sql = `SELECT * FROM "Product"
+                 WHERE (name ILIKE $1 OR description ILIKE $1)
+                   AND ($2::text IS NULL OR category = $2)
+                 ORDER BY ${orderBy}`;
+    return prisma.$queryRawUnsafe<Product[]>(sql, `%${q ?? ""}%`, category && category !== "All" ? category : null);
   },
   findAll() {
     return prisma.product.findMany({ orderBy: { createdAt: "asc" } });

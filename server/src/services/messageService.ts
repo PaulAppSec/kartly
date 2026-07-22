@@ -26,13 +26,12 @@ export const messageService = {
     return (await messageRepo.listForUser(userId)).map(toDTO);
   },
 
-  // Object-level authz: only a participant may read a message; anyone else
-  // gets 404 (not 403) so IDs don't leak existence. Secure baseline for #5.
-  async getById(userId: string, messageId: string) {
+  // ⚠️ VULNERABLE ON PURPOSE (main) — VULNS.md #5 (IDOR). No participant check:
+  // any authenticated user can read anyone's private messages by id.
+  // Fix (fix/idor) restores the participant check.
+  async getById(_userId: string, messageId: string) {
     const msg = await messageRepo.findById(messageId);
-    if (!msg || (msg.fromId !== userId && msg.toId !== userId)) {
-      throw new HttpError(404, "Message not found.");
-    }
+    if (!msg) throw new HttpError(404, "Message not found.");
     return toDTO(msg);
   },
 

@@ -7,10 +7,10 @@
 
 **Status legend:** 🔴 pending (not yet introduced) · 🟠 live on `main` (documented + exploit test) · 🟢 fixed on `fix/<slug>` (PR open, fixed test passing)
 
-> **Phase status:** Phase 3 in progress. **4 of 24 live:** #1 SQLi (UNION), #2
-> SQLi (auth bypass), #3 blind SQLi, #4 broken auth. Each has a passing exploit
-> test in `server/tests/exploits/` and a saved artifact in `artifacts/`. The rest
-> are still the secure Phase 2 baseline.
+> **Phase status:** Phase 3 in progress. **5 of 24 live:** #1 SQLi (UNION), #2
+> SQLi (auth bypass), #3 blind SQLi, #4 broken auth, #5 IDOR. Each has a passing
+> exploit test in `server/tests/exploits/` and a saved artifact in `artifacts/`.
+> The rest are still the secure Phase 2 baseline.
 
 ## Matrix
 
@@ -20,7 +20,7 @@
 | 2 | SQLi – auth bypass | `POST /api/auth/login` | `fix/sqli-login` | 🟠 live on `main` |
 | 3 | Blind SQLi (boolean/time) | `GET /api/products?sort=` | `fix/blind-sqli` | 🟠 live on `main` |
 | 4 | Broken auth | login / register / seed | `fix/auth` | 🟠 live on `main` |
-| 5 | Broken access control (IDOR) | `GET /api/orders/:id`, `/messages/:id` | `fix/idor` | 🔴 pending |
+| 5 | Broken access control (IDOR) | `GET /api/orders/:id`, `/messages/:id` | `fix/idor` | 🟠 live on `main` |
 | 6 | Privilege escalation | `/api/admin/*` | `fix/authz-admin` | 🔴 pending |
 | 7 | Mass assignment | `POST /api/register`, `PATCH /api/me` | `fix/mass-assignment` | 🔴 pending |
 | 8 | Stored XSS | reviews, bio, description, messages | `fix/stored-xss` | 🔴 pending |
@@ -136,7 +136,14 @@ the placeholders below reserve the slot and record the plan.
 > because the raw-SQL login only functions over plaintext credentials — splitting
 > them yields an intermediate commit where no one can log in. They remain
 > separate rows and separate fix branches (`fix/sqli-login`, `fix/auth`).
-### 5. Broken access control (IDOR) — 🔴 pending
+### 5. Broken access control (IDOR) — 🟠 live on `main`
+- **Where:** `server/src/services/orderService.ts` (`getById`), `messageService.ts` (`getById`) → `GET /api/orders/:id`, `GET /api/messages/:id`
+- **Vulnerable code:** the `customerId === userId` / participant check is removed — only existence is checked.
+- **Exploit:** as alice, `GET /api/orders/o-bob-1` → 200 returns bob's order; likewise any `/api/messages/:id`.
+- **Impact:** Any logged-in user reads every order and private message by enumerating ids — order history, addresses, DMs.
+- **Fix (`fix/idor`):** object-level authorization — verify ownership, return **404** (not 403) so ids don't leak existence.
+- **Detect:** handlers that fetch by id without an owner predicate; one account reading many distinct ids.
+- **Exploit test:** `server/tests/exploits/05-idor.test.ts`
 ### 6. Privilege escalation — 🔴 pending
 ### 7. Mass assignment — 🔴 pending
 ### 8. Stored XSS — 🔴 pending

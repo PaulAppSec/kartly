@@ -145,6 +145,7 @@ the placeholders below reserve the slot and record the plan.
 - **Fix (`fix/idor`):** object-level authorization — verify ownership, return **404** (not 403) so ids don't leak existence.
 - **Detect:** handlers that fetch by id without an owner predicate; one account reading many distinct ids.
 - **Exploit test:** `server/tests/exploits/05-idor.test.ts`
+
 ### 6. Privilege escalation — 🟠 live on `main`
 - **Where:** `server/src/routes/adminApi.ts` → `/api/admin/*`
 - **Vulnerable code:** router uses `requireAuth` only — no `requireRole('ADMIN')`.
@@ -153,6 +154,7 @@ the placeholders below reserve the slot and record the plan.
 - **Fix (`fix/authz-admin`):** add `requireRole('ADMIN')` to the admin router (deny by default).
 - **Detect:** admin routes lacking a role check; non-admin principals hitting `/api/admin/*`.
 - **Exploit test:** `server/tests/exploits/06-privesc.test.ts`
+
 ### 7. Mass assignment — 🟠 live on `main`
 - **Where:** `server/src/schemas/authSchemas.ts` (`.passthrough()`), `authService.register` (spreads body) → `POST /api/auth/register`
 - **Vulnerable code:**

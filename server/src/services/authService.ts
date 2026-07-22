@@ -10,6 +10,7 @@ import {
   verifyRefreshToken,
   verifyResetToken,
 } from "../lib/jwt.js";
+import { hashPassword, verifyPassword } from "../lib/hashing.js";
 import { HttpError } from "../middleware/errorHandler.js";
 import type { LoginInput, RegisterInput } from "../schemas/authSchemas.js";
 
@@ -52,8 +53,10 @@ export const authService = {
     // body is spread into the create, so `{"role":"ADMIN"}` self-promotes.
     // Also #4 (broken auth): password stored in PLAINTEXT.
     // Fix (fix/mass-assignment) whitelists fields; fix/auth hashes.
+    // FIX (fix/auth) — VULNS.md #4: store a scrypt KDF hash, not cleartext.
+    // (The mass-assignment spread of `...rest` is the separate fix/mass-assignment.)
     const { email, name, password, ...rest } = input;
-    const data = { ...rest, email, name, passwordHash: password as string };
+    const data = { ...rest, email, name, passwordHash: hashPassword(password as string) };
     const user = await prisma.user.create({ data: data as Prisma.UserUncheckedCreateInput });
     return { user: toPublicUser(user), ...issueTokens(user) };
   },
@@ -62,12 +65,13 @@ export const authService = {
   // Both the email and the plaintext password are concatenated into raw SQL, so
   // `admin@kartly.test'-- ` comments out the password check and logs in as
   // admin. Fix (fix/sqli-login) parameterizes and compares a hash.
+  // FIX (fix/auth) — VULNS.md #4: verify the password against the stored scrypt
+  // hash with a constant-time comparison (verifyPassword). Also parameterized.
   async login(input: LoginInput) {
-    const rows = await prisma.$queryRawUnsafe<User[]>(
-      `SELECT * FROM "User" WHERE email = '${input.email}' AND "passwordHash" = '${input.password}'`,
-    );
-    const user = rows[0];
-    if (!user) throw new HttpError(401, "Incorrect email or password.");
+    const user = await userRepo.findByEmail(input.email);
+    if (!user || !verifyPassword(input.password, user.passwordHash)) {
+      throw new HttpError(401, "Incorrect email or password.");
+    }
     return { user: toPublicUser(user), ...issueTokens(user) };
   },
 
@@ -110,7 +114,7 @@ export const authService = {
     }
     const user = await userRepo.findById(userId);
     if (!user) throw new HttpError(400, "This reset link is invalid or has expired.");
-    // ⚠️ VULNERABLE (main) — #4 broken auth: stored in plaintext.
-    await userRepo.update(user.id, { passwordHash: newPassword });
+    // FIX (fix/auth) — #4: store a scrypt hash of the new password.
+    await userRepo.update(user.id, { passwordHash: hashPassword(newPassword) });
   },
 };

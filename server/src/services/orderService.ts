@@ -39,12 +39,14 @@ export const orderService = {
     return (await orderRepo.listForUser(userId)).map((o) => toDTO(o as OrderRow));
   },
 
-  // ⚠️ VULNERABLE ON PURPOSE (main) — VULNS.md #5 (IDOR). The ownership check is
-  // gone: any authenticated user can read ANY order by guessing/enumerating its
-  // id. Fix (fix/idor) restores the `customerId === userId` check (404, not 403).
-  async getById(_userId: string, orderId: string) {
+  // FIX (fix/idor) — VULNS.md #5. Enforce object-level authorization: only the
+  // owner may read an order, and a non-owner gets 404 (not 403) so ids don't
+  // leak existence.
+  async getById(userId: string, orderId: string) {
     const order = await orderRepo.findById(orderId);
-    if (!order) throw new HttpError(404, "Order not found.");
+    if (!order || (order as { customerId?: string }).customerId !== userId) {
+      throw new HttpError(404, "Order not found.");
+    }
     return toDTO(order as OrderRow);
   },
 

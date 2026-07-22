@@ -12,7 +12,11 @@ export const meRouter = Router();
 meRouter.use(requireAuth);
 
 meRouter.get("/", userController.me);
-meRouter.patch("/", csrfGuard, validate(updateMeSchema), userController.updateMe);
+// ⚠️ VULNERABLE ON PURPOSE (main) — VULNS.md #11 (CSRF). The profile/email
+// update is state-changing and cookie-authenticated but no longer carries a
+// csrfGuard, so an attacker page can auto-submit it cross-site. Fix (fix/csrf)
+// restores csrfGuard here.
+meRouter.patch("/", validate(updateMeSchema), userController.updateMe);
 
 meRouter.post("/avatar", csrfGuard, uploadImage.single("image"), userController.uploadAvatar);
 meRouter.post("/avatar-url", csrfGuard, validate(importUrlSchema), userController.avatarFromUrl);

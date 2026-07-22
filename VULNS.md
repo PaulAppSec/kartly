@@ -7,10 +7,9 @@
 
 **Status legend:** 🔴 pending (not yet introduced) · 🟠 live on `main` (documented + exploit test) · 🟢 fixed on `fix/<slug>` (PR open, fixed test passing)
 
-> **Phase status:** Phase 3 in progress. **10 of 24 live:** #1–#7 plus #8 stored
-> XSS, #9 reflected XSS, #10 DOM XSS. Each has a passing exploit test in
-> `server/tests/exploits/` and a saved artifact in `artifacts/`. The rest are
-> still the secure Phase 2 baseline.
+> **Phase status:** Phase 3 in progress. **11 of 24 live:** #1–#10 plus #11 CSRF.
+> Each has a passing exploit test in `server/tests/exploits/` and a saved
+> artifact in `artifacts/`. The rest are still the secure Phase 2 baseline.
 
 ## Matrix
 
@@ -26,7 +25,7 @@
 | 8 | Stored XSS | reviews, bio, description, messages | `fix/stored-xss` | 🟠 live on `main` |
 | 9 | Reflected XSS | search / server error / share page | `fix/reflected-xss` | 🟠 live on `main` |
 | 10 | DOM XSS | client renders `location.hash`/param | `fix/dom-xss` | 🟠 live on `main` |
-| 11 | CSRF | `POST /account/email`, place order | `fix/csrf` | 🔴 pending |
+| 11 | CSRF | `PATCH /api/me` (profile/email) | `fix/csrf` | 🟠 live on `main` |
 | 12 | SSRF | import-image-from-URL, avatar-from-URL | `fix/ssrf` | 🔴 pending |
 | 13 | Unrestricted file upload | avatar / product image | `fix/upload` | 🔴 pending |
 | 14 | Path traversal / LFI | `GET /download?file=` | `fix/path-traversal` | 🔴 pending |
@@ -207,7 +206,14 @@ the placeholders below reserve the slot and record the plan.
 - **Fix (`fix/dom-xss`):** write to `textContent` (inert sink); never pass untrusted data to `innerHTML`.
 - **Detect:** `innerHTML`/`document.write` fed by `location.*`; DOM-XSS scanners; code review of client sinks.
 - **Exploit test:** `server/tests/exploits/10-dom-xss.test.ts`
-### 11. CSRF — 🔴 pending
+### 11. CSRF — 🟠 live on `main`
+- **Where:** `server/src/routes/me.ts` → `PATCH /api/me` (profile/email update).
+- **Vulnerable code:** the route dropped `csrfGuard` — `meRouter.patch("/", validate(updateMeSchema), userController.updateMe)`. Auth is via a `SameSite=Lax` cookie, and a top-level `PATCH`/form navigation still carries it.
+- **Exploit:** an attacker page auto-submits `PATCH /api/me` with the victim's cookie and **no** `X-CSRF-Token` → 200, profile changed.
+- **Impact:** Cross-site state change on the victim's account (e.g. change email → password-reset takeover).
+- **Fix (`fix/csrf`):** restore `csrfGuard` (double-submit token) on all cookie-authed state-changing routes; keep `SameSite`.
+- **Detect:** state-changing route with no CSRF/token check; writes lacking the `X-CSRF-Token` header succeeding.
+- **Exploit test:** `server/tests/exploits/11-csrf.test.ts`
 ### 12. SSRF — 🔴 pending
 ### 13. Unrestricted file upload — 🔴 pending
 ### 14. Path traversal / LFI — 🔴 pending

@@ -7,10 +7,11 @@
 
 **Status legend:** 🔴 pending (not yet introduced) · 🟠 live on `main` (documented + exploit test) · 🟢 fixed on `fix/<slug>` (PR open, fixed test passing)
 
-> **Phase status:** Phase 3 in progress. **6 of 24 live:** #1 SQLi (UNION), #2
+> **Phase status:** Phase 3 in progress. **7 of 24 live:** #1 SQLi (UNION), #2
 > SQLi (auth bypass), #3 blind SQLi, #4 broken auth, #5 IDOR, #6 privilege
-> escalation. Each has a passing exploit test in `server/tests/exploits/` and a
-> saved artifact in `artifacts/`. The rest are still the secure Phase 2 baseline.
+> escalation, #7 mass assignment. Each has a passing exploit test in
+> `server/tests/exploits/` and a saved artifact in `artifacts/`. The rest are
+> still the secure Phase 2 baseline.
 
 ## Matrix
 
@@ -22,7 +23,7 @@
 | 4 | Broken auth | login / register / seed | `fix/auth` | 🟠 live on `main` |
 | 5 | Broken access control (IDOR) | `GET /api/orders/:id`, `/messages/:id` | `fix/idor` | 🟠 live on `main` |
 | 6 | Privilege escalation | `/api/admin/*` | `fix/authz-admin` | 🟠 live on `main` |
-| 7 | Mass assignment | `POST /api/register`, `PATCH /api/me` | `fix/mass-assignment` | 🔴 pending |
+| 7 | Mass assignment | `POST /api/auth/register` | `fix/mass-assignment` | 🟠 live on `main` |
 | 8 | Stored XSS | reviews, bio, description, messages | `fix/stored-xss` | 🔴 pending |
 | 9 | Reflected XSS | search / server error / share page | `fix/reflected-xss` | 🔴 pending |
 | 10 | DOM XSS | client renders `location.hash`/param | `fix/dom-xss` | 🔴 pending |
@@ -152,7 +153,18 @@ the placeholders below reserve the slot and record the plan.
 - **Fix (`fix/authz-admin`):** add `requireRole('ADMIN')` to the admin router (deny by default).
 - **Detect:** admin routes lacking a role check; non-admin principals hitting `/api/admin/*`.
 - **Exploit test:** `server/tests/exploits/06-privesc.test.ts`
-### 7. Mass assignment — 🔴 pending
+### 7. Mass assignment — 🟠 live on `main`
+- **Where:** `server/src/schemas/authSchemas.ts` (`.passthrough()`), `authService.register` (spreads body) → `POST /api/auth/register`
+- **Vulnerable code:**
+  ```ts
+  const { email, name, password, ...rest } = input;
+  await prisma.user.create({ data: { ...rest, email, name, passwordHash: password } });
+  ```
+- **Exploit:** `POST /api/auth/register {"email":"…","password":"…","name":"…","role":"ADMIN"}` → account created as ADMIN.
+- **Impact:** Self-service privilege escalation at signup; any attacker mints an admin account.
+- **Fix (`fix/mass-assignment`):** drop `.passthrough()` and construct the create from an explicit field allowlist (Zod `.pick`), never spreading the body.
+- **Detect:** `{...req.body}` into ORM create/update; a signup setting a privileged field.
+- **Exploit test:** `server/tests/exploits/07-mass-assignment.test.ts`
 ### 8. Stored XSS — 🔴 pending
 ### 9. Reflected XSS — 🔴 pending
 ### 10. DOM XSS — 🔴 pending

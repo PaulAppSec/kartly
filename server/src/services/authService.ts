@@ -1,4 +1,4 @@
-import type { User } from "@prisma/client";
+import type { Prisma, User } from "@prisma/client";
 import { prisma } from "../data/prisma.js";
 import { userRepo } from "../data/userRepo.js";
 import { env } from "../lib/env.js";
@@ -44,18 +44,17 @@ function issueTokens(user: User) {
 }
 
 export const authService = {
-  async register(input: RegisterInput) {
+  async register(input: RegisterInput & Record<string, unknown>) {
     const existing = await userRepo.findByEmail(input.email);
     if (existing) throw new HttpError(409, "An account with that email already exists.");
 
-    // role is intentionally NOT taken from input — always CUSTOMER on signup.
-    // ⚠️ VULNERABLE (main) — VULNS.md #4 (broken auth): the password is stored
-    // in PLAINTEXT. Fix (fix/auth) hashes with a strong KDF.
-    const user = await userRepo.create({
-      email: input.email,
-      passwordHash: input.password,
-      name: input.name,
-    });
+    // ⚠️ VULNERABLE (main) — VULNS.md #7 (mass assignment): the whole request
+    // body is spread into the create, so `{"role":"ADMIN"}` self-promotes.
+    // Also #4 (broken auth): password stored in PLAINTEXT.
+    // Fix (fix/mass-assignment) whitelists fields; fix/auth hashes.
+    const { email, name, password, ...rest } = input;
+    const data = { ...rest, email, name, passwordHash: password as string };
+    const user = await prisma.user.create({ data: data as Prisma.UserUncheckedCreateInput });
     return { user: toPublicUser(user), ...issueTokens(user) };
   },
 

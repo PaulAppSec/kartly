@@ -7,10 +7,10 @@
 
 **Status legend:** 🔴 pending (not yet introduced) · 🟠 live on `main` (documented + exploit test) · 🟢 fixed on `fix/<slug>` (PR open, fixed test passing)
 
-> **Phase status:** Phase 3 in progress. **22 of 24 live:** #1–#21, #23. Each has
-> a passing exploit test in `server/tests/exploits/` and a saved artifact in
+> **Phase status:** Phase 3 in progress. **23 of 24 live:** #1–#23. Each has a
+> passing exploit test in `server/tests/exploits/` and a saved artifact in
 > `artifacts/`. The dangerous classes are sandboxed to the container per §7
-> (decoys only). #22 and #24 are still the secure Phase 2 baseline.
+> (decoys only). Only #24 remains on the secure Phase 2 baseline.
 
 ## Matrix
 
@@ -37,7 +37,7 @@
 | 19 | JWT weaknesses | API auth | `fix/jwt` | 🟠 live on `main` |
 | 20 | Security misconfig | verbose errors, `/.env`, debug route | `fix/misconfig` | 🟠 live on `main` |
 | 21 | Sensitive data exposure | `GET /api/me` returns `passwordHash` | `fix/data-exposure` | 🟠 live on `main` |
-| 22 | Business logic | checkout: qty/price/coupon | `fix/business-logic` | 🔴 pending |
+| 22 | Business logic | checkout: qty/price | `fix/business-logic` | 🟠 live on `main` |
 | 23 | CORS misconfig | API CORS | `fix/cors` | 🟠 live on `main` |
 | 24 | No rate limiting | login, coupon, reset | `fix/rate-limit` | 🔴 pending |
 
@@ -345,7 +345,18 @@ the placeholders below reserve the slot and record the plan.
 - **Fix (`fix/data-exposure`):** return an explicit DTO (`toPublicUser`) — never serialize the raw row.
 - **Detect:** responses containing `passwordHash`/tokens; ORM rows returned directly from controllers.
 - **Exploit test:** `server/tests/exploits/21-data-exposure.test.ts`
-### 22. Business logic — 🔴 pending
+### 22. Business logic — 🟠 live on `main`
+- **Where:** `server/src/schemas/orderSchemas.ts` + `server/src/services/orderService.ts` (`checkout`) → `POST /api/orders`.
+- **Vulnerable code:** the schema accepts a client `unitPrice` and `qty` from `-1000`; checkout uses `item.unitPrice ?? product.price` and no longer enforces `stock >= qty`.
+- **Exploit (copy-paste):**
+  ```
+  POST /api/orders { "items": [ { "productId": "p01", "qty": 1, "unitPrice": 0 } ] }   → total $0
+  POST /api/orders { "items": [ { "productId": "p01", "qty": -5 } ] }                   → negative total
+  ```
+- **Impact:** Buy at any price / mint store credit with negative quantities — direct revenue loss.
+- **Fix (`fix/business-logic`):** price every line from the DB, ignore client pricing, require `qty >= 1`, enforce stock (the atomic single-use coupon path already stands).
+- **Detect:** server trusting client price/qty; order totals below cost; negative quantities.
+- **Exploit test:** `server/tests/exploits/22-business-logic.test.ts`
 ### 23. CORS misconfig — 🟠 live on `main`
 - **Where:** `server/src/app.ts` → `cors({ origin: true, credentials: true })`.
 - **Vulnerable code:** `origin:true` reflects any request Origin and `credentials:true` allows cookies.

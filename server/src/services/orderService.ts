@@ -48,10 +48,11 @@ export const orderService = {
     return toDTO(order as OrderRow);
   },
 
-  // Secure checkout: price is computed server-side from the DB, stock is
-  // enforced, and the coupon is applied exactly once via an atomic conditional
-  // update — the whole thing runs in a transaction. This is the correct
-  // baseline for the business-logic lesson (#22); Phase 3 breaks each guard.
+  // ⚠️ VULNERABLE ON PURPOSE (main) — VULNS.md #22 (Business logic). Checkout
+  // now trusts the CLIENT-supplied `unitPrice` when present and allows negative
+  // quantities, so a shopper sets their own price or drives the total negative.
+  // The fix (fix/business-logic) prices every line from the DB and rejects
+  // qty < 1. (The coupon path stays atomic/single-use here.)
   async checkout(userId: string, input: CheckoutInput) {
     if (input.addressId) {
       const addr = await addressRepo.findById(input.addressId);
@@ -67,12 +68,11 @@ export const orderService = {
       const lineItems = input.items.map((item) => {
         const product = byId.get(item.productId);
         if (!product) throw new HttpError(400, `Unknown product: ${item.productId}`);
-        if (product.stock < item.qty) {
-          throw new HttpError(409, `Not enough stock for “${product.name}”.`);
-        }
-        const unitCents = Math.round(Number(product.price) * 100);
+        // #22: client `unitPrice` is trusted when present; negative qty allowed.
+        const unit = item.unitPrice !== undefined ? item.unitPrice : Number(product.price);
+        const unitCents = Math.round(unit * 100);
         subtotalCents += unitCents * item.qty;
-        return { productId: product.id, qty: item.qty, unitPrice: Number(product.price) };
+        return { productId: product.id, qty: item.qty, unitPrice: unit };
       });
 
       let couponCode: string | null = null;

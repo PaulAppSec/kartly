@@ -3,7 +3,7 @@ import { productRepo } from "../data/productRepo.js";
 import { HttpError } from "../middleware/errorHandler.js";
 import { fetchUrlUnsafe } from "../lib/urlFetch.js";
 import { saveRawBuffer, saveUnrestrictedUpload } from "../lib/upload.js";
-import { parseProductXmlUnsafe } from "../lib/xml.js";
+import { parseProductXml } from "../lib/xml.js";
 import type { CreateProductInput, UpdateProductInput } from "../schemas/productSchemas.js";
 import { toProductDTO } from "./productService.js";
 
@@ -55,8 +55,9 @@ export const sellerService = {
   },
 
   async importXml(sellerId: string, xml: string) {
-    // #17 XXE — DTD/external entities resolved during parse.
-    const parsed = parseProductXmlUnsafe(xml);
+    // FIX (fix/xxe) — VULNS.md #17: parse with DTD/entity processing disabled;
+    // any <!DOCTYPE>/<!ENTITY> is rejected outright, so no file read occurs.
+    const parsed = parseProductXml(xml);
     const created = await productRepo.createMany(
       parsed.map((p) => ({
         sellerId,

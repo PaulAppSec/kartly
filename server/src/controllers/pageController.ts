@@ -1,5 +1,4 @@
 import { join, resolve } from "node:path";
-import ejs from "ejs";
 import type { NextFunction, Request, Response } from "express";
 import { ACCESS_COOKIE } from "../lib/cookies.js";
 import { announcementService } from "../services/announcementService.js";
@@ -66,20 +65,13 @@ export const pageController = {
         announcementService.get(seller.id),
         sellerService.listMine(seller.id),
       ]);
+      // FIX (fix/ssti) — VULNS.md #16. Pass the announcement through as plain
+      // DATA and let the view escape it (see store.ejs). It is never compiled as
+      // a template, so `<%= 7*7 %>` renders literally instead of evaluating.
       const template = announcement?.template ?? "Welcome to our store!";
-      // ⚠️ VULNERABLE ON PURPOSE (main) — VULNS.md #16 (SSTI). The seller-supplied
-      // announcement is COMPILED as an EJS template instead of rendered as data,
-      // so `<%= 7*7 %>` evaluates and `<%= process.env… %>` / require() give
-      // secret disclosure → RCE. The fix (fix/ssti) renders it as escaped data.
-      let announcementHtml: string;
-      try {
-        announcementHtml = ejs.render(template, {});
-      } catch {
-        announcementHtml = template;
-      }
       res.render("store", {
         seller: { id: seller.id, name: seller.name },
-        announcement: announcementHtml,
+        announcement: template,
         products,
         money,
       });

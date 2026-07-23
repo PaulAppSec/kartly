@@ -1,4 +1,4 @@
-import { join, resolve } from "node:path";
+import { resolve } from "node:path";
 import ejs from "ejs";
 import type { NextFunction, Request, Response } from "express";
 import { ACCESS_COOKIE } from "../lib/cookies.js";
@@ -9,6 +9,7 @@ import { reviewService } from "../services/reviewService.js";
 import { sellerService } from "../services/sellerService.js";
 import { userRepo } from "../data/userRepo.js";
 import { HttpError } from "../middleware/errorHandler.js";
+import { resolveWithinBase } from "../lib/safePath.js";
 
 const DOWNLOADS_DIR = resolve(process.cwd(), "server/downloads");
 const money = (n: number) => `$${n.toFixed(2)}`;
@@ -103,16 +104,14 @@ export const pageController = {
     next();
   },
 
-  // ⚠️ VULNERABLE ON PURPOSE (main) — VULNS.md #14 (Path traversal / LFI). The
-  // user filename is joined onto the base dir with no confinement, so
-  // `?file=../decoys/secret.txt` escapes the downloads directory. Sandboxed per
-  // §7 — demos read a planted decoy, not real host secrets. The fix
-  // (fix/path-traversal) restores resolveWithinBase().
+  // FIX (fix/path-traversal) — VULNS.md #14. resolveWithinBase resolves the
+  // joined path and verifies it still sits inside DOWNLOADS_DIR, so `..`
+  // traversal is rejected (400) and nothing outside downloads/ can be read.
   download(req: Request, res: Response, next: NextFunction) {
     try {
       const file = typeof req.query.file === "string" ? req.query.file : "";
       if (!file) throw new HttpError(400, "Specify a file.");
-      const target = join(DOWNLOADS_DIR, file);
+      const target = resolveWithinBase(DOWNLOADS_DIR, file);
       res.download(target, (err) => {
         if (err && !res.headersSent) next(new HttpError(404, "File not found."));
       });

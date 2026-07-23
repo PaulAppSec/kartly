@@ -22,9 +22,8 @@
       <div style="padding:28px;">
         <span class="tag"><%= product.category %></span>
         <h1 style="margin-top:12px;"><%= product.name %></h1>
-        <%# VULNERABLE ON PURPOSE (main) — VULNS.md #8 (Stored XSS): seller-
-            controlled description rendered as raw HTML. Fix escapes/sanitizes. %>
-        <p class="muted"><%- product.description %></p>
+        <%# FIX (fix/stored-xss) — VULNS.md #8: escape seller-controlled data. %>
+        <p class="muted"><%= product.description %></p>
         <div class="row" style="margin-top:16px;">
           <span class="total"><%= money(product.price) %></span>
           <a class="btn" href="/">Shop on Kartly</a>
@@ -40,9 +39,8 @@
       <% reviews.forEach(function(r){ %>
         <div class="card" style="margin-top:12px;">
           <div class="row"><strong><%= r.author.name %></strong><span class="tag"><%= r.rating %>★</span></div>
-          <%# VULNERABLE ON PURPOSE (main) — VULNS.md #8 (Stored XSS): any
-              shopper's review body is rendered as raw HTML on this public page. %>
-          <p class="muted" style="margin-top:8px;"><%- r.body %></p>
+          <%# FIX (fix/stored-xss) — VULNS.md #8: escape user-supplied review text. %>
+          <p class="muted" style="margin-top:8px;"><%= r.body %></p>
         </div>
       <% }) %>
     <% } %>

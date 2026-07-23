@@ -1,4 +1,4 @@
-import type { Prisma, User } from "@prisma/client";
+import type { User } from "@prisma/client";
 import { prisma } from "../data/prisma.js";
 import { userRepo } from "../data/userRepo.js";
 import { env } from "../lib/env.js";
@@ -48,13 +48,14 @@ export const authService = {
     const existing = await userRepo.findByEmail(input.email);
     if (existing) throw new HttpError(409, "An account with that email already exists.");
 
-    // ⚠️ VULNERABLE (main) — VULNS.md #7 (mass assignment): the whole request
-    // body is spread into the create, so `{"role":"ADMIN"}` self-promotes.
-    // Also #4 (broken auth): password stored in PLAINTEXT.
-    // Fix (fix/mass-assignment) whitelists fields; fix/auth hashes.
-    const { email, name, password, ...rest } = input;
-    const data = { ...rest, email, name, passwordHash: password as string };
-    const user = await prisma.user.create({ data: data as Prisma.UserUncheckedCreateInput });
+    // FIX (fix/mass-assignment) — VULNS.md #7: construct the create from an
+    // EXPLICIT field allowlist; never spread the request body. An injected
+    // `role` (even if it reached here) cannot set a privileged column.
+    // (Password is still stored as-is here — hashing is the separate fix/auth.)
+    const { email, name, password } = input;
+    const user = await prisma.user.create({
+      data: { email, name, passwordHash: password },
+    });
     return { user: toPublicUser(user), ...issueTokens(user) };
   },
 

@@ -1,8 +1,8 @@
 import type { Role } from "@prisma/client";
 import { productRepo } from "../data/productRepo.js";
 import { HttpError } from "../middleware/errorHandler.js";
-import { fetchUrlUnsafe } from "../lib/urlFetch.js";
-import { saveRawBuffer, saveUnrestrictedUpload } from "../lib/upload.js";
+import { fetchRemoteImage } from "../lib/urlFetch.js";
+import { saveImageBuffer, saveUnrestrictedUpload } from "../lib/upload.js";
 import { parseProductXmlUnsafe } from "../lib/xml.js";
 import type { CreateProductInput, UpdateProductInput } from "../schemas/productSchemas.js";
 import { toProductDTO } from "./productService.js";
@@ -45,12 +45,12 @@ export const sellerService = {
     return toProductDTO(await productRepo.update(productId, { imageUrl: url }));
   },
 
+  // FIX (fix/ssrf) — VULNS.md #12: SSRF-safe fetch (allowlist scheme, block
+  // internal ranges, cap size/time, require an image) before saving.
   async setImageFromUrl(sellerId: string, role: Role, productId: string, sourceUrl: string) {
     await ownedProductOr404(productId, sellerId, role);
-    // #12 SSRF — raw fetch of an attacker URL; the fetched bytes are persisted
-    // and served back via /uploads, exposing internal responses.
-    const { buffer } = await fetchUrlUnsafe(sourceUrl);
-    const url = await saveRawBuffer(buffer);
+    const { buffer } = await fetchRemoteImage(sourceUrl);
+    const url = await saveImageBuffer(buffer);
     return toProductDTO(await productRepo.update(productId, { imageUrl: url }));
   },
 

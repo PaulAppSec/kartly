@@ -1,8 +1,8 @@
 import { addressRepo } from "../data/addressRepo.js";
 import { userRepo } from "../data/userRepo.js";
 import { HttpError } from "../middleware/errorHandler.js";
-import { fetchUrlUnsafe } from "../lib/urlFetch.js";
-import { saveRawBuffer, saveUnrestrictedUpload } from "../lib/upload.js";
+import { fetchRemoteImage } from "../lib/urlFetch.js";
+import { saveImageBuffer, saveUnrestrictedUpload } from "../lib/upload.js";
 import type { AddressInput, UpdateMeInput } from "../schemas/userSchemas.js";
 import { toPublicUser } from "./authService.js";
 
@@ -29,10 +29,13 @@ export const userService = {
     return toPublicUser(await userRepo.update(userId, { avatarUrl: url }));
   },
 
+  // FIX (fix/ssrf) — VULNS.md #12. fetchRemoteImage allows only http/https,
+  // resolves the host and blocks private/loopback/link-local ranges, caps
+  // size/time, and requires an image content-type — so internal targets are
+  // refused (400) before any request is made.
   async setAvatarFromUrl(userId: string, sourceUrl: string) {
-    // #12 SSRF — raw fetch of a user-supplied URL, response persisted/served.
-    const { buffer } = await fetchUrlUnsafe(sourceUrl);
-    const url = await saveRawBuffer(buffer);
+    const { buffer } = await fetchRemoteImage(sourceUrl);
+    const url = await saveImageBuffer(buffer);
     return toPublicUser(await userRepo.update(userId, { avatarUrl: url }));
   },
 

@@ -2,7 +2,7 @@ import { addressRepo } from "../data/addressRepo.js";
 import { userRepo } from "../data/userRepo.js";
 import { HttpError } from "../middleware/errorHandler.js";
 import { fetchUrlUnsafe } from "../lib/urlFetch.js";
-import { saveRawBuffer, saveUnrestrictedUpload } from "../lib/upload.js";
+import { saveRawBuffer, saveValidatedImage } from "../lib/upload.js";
 import type { AddressInput, UpdateMeInput } from "../schemas/userSchemas.js";
 import { toPublicUser } from "./authService.js";
 
@@ -23,9 +23,11 @@ export const userService = {
     return toPublicUser(user);
   },
 
+  // FIX (fix/upload) — VULNS.md #13. saveValidatedImage verifies the file by
+  // magic bytes (not client MIME/extension), randomizes the name, and forces a
+  // safe extension, so a script .html is rejected (415).
   async setAvatarFromUpload(userId: string, file: Express.Multer.File | undefined) {
-    // #13 unrestricted upload.
-    const url = await saveUnrestrictedUpload(file);
+    const url = await saveValidatedImage(file);
     return toPublicUser(await userRepo.update(userId, { avatarUrl: url }));
   },
 

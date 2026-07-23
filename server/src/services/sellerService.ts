@@ -2,7 +2,7 @@ import type { Role } from "@prisma/client";
 import { productRepo } from "../data/productRepo.js";
 import { HttpError } from "../middleware/errorHandler.js";
 import { fetchUrlUnsafe } from "../lib/urlFetch.js";
-import { saveRawBuffer, saveUnrestrictedUpload } from "../lib/upload.js";
+import { saveRawBuffer, saveValidatedImage } from "../lib/upload.js";
 import { parseProductXmlUnsafe } from "../lib/xml.js";
 import type { CreateProductInput, UpdateProductInput } from "../schemas/productSchemas.js";
 import { toProductDTO } from "./productService.js";
@@ -40,8 +40,8 @@ export const sellerService = {
     file: Express.Multer.File | undefined,
   ) {
     await ownedProductOr404(productId, sellerId, role);
-    // #13 unrestricted upload — no content validation, keeps client extension.
-    const url = await saveUnrestrictedUpload(file);
+    // FIX (fix/upload) — VULNS.md #13: validate by magic bytes before saving.
+    const url = await saveValidatedImage(file);
     return toProductDTO(await productRepo.update(productId, { imageUrl: url }));
   },
 

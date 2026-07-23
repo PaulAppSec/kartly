@@ -1,12 +1,13 @@
 import { Router } from "express";
 import { adminApiController } from "../controllers/adminApiController.js";
 import { requireAuth } from "../middleware/auth.js";
+import { requireRole } from "../middleware/roleGuard.js";
 
-// ⚠️ VULNERABLE ON PURPOSE (main) — VULNS.md #6 (privilege escalation).
-// requireAuth only — the ADMIN role guard is missing.
+// FIX (fix/authz-admin) — VULNS.md #6. Deny by default: the admin JSON API now
+// requires the ADMIN role, so a CUSTOMER/SELLER token is rejected with 403.
 export const adminApiRouter = Router();
 
-adminApiRouter.use(requireAuth); // <-- fix/authz-admin adds requireRole("ADMIN")
+adminApiRouter.use(requireAuth, requireRole("ADMIN"));
 
 adminApiRouter.get("/users", adminApiController.listUsers);
 adminApiRouter.post("/users/:id/role", adminApiController.setRole);

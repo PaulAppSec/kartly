@@ -1,3 +1,4 @@
+import { useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useCart } from "../context/CartContext";
 import { money } from "../lib/format";
@@ -5,6 +6,18 @@ import { money } from "../lib/format";
 export function CartDrawer({ open, onClose }: { open: boolean; onClose: () => void }) {
   const { lines, subtotal, setQty, remove, count } = useCart();
   const navigate = useNavigate();
+  const closeRef = useRef<HTMLButtonElement>(null);
+
+  // Dialog behaviour: close on Escape and move focus to the panel when it opens.
+  useEffect(() => {
+    if (!open) return;
+    closeRef.current?.focus();
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [open, onClose]);
 
   const goCheckout = () => {
     onClose();
@@ -18,10 +31,16 @@ export function CartDrawer({ open, onClose }: { open: boolean; onClose: () => vo
         onClick={onClose}
         aria-hidden={!open}
       />
-      <aside className={`drawer ${open ? "open" : ""}`} aria-hidden={!open} aria-label="Shopping cart">
+      <aside
+        className={`drawer ${open ? "open" : ""}`}
+        role="dialog"
+        aria-modal={open}
+        aria-hidden={!open}
+        aria-label="Shopping cart"
+      >
         <div className="drawer-head">
           <h3>Your cart {count > 0 && <span className="muted tnum">({count})</span>}</h3>
-          <button className="btn-icon" onClick={onClose} aria-label="Close cart">
+          <button className="btn-icon" onClick={onClose} aria-label="Close cart" ref={closeRef}>
             ✕
           </button>
         </div>

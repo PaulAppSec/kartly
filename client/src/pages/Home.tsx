@@ -31,7 +31,7 @@ export function Home({ onOpenCart }: { onOpenCart: () => void }) {
     products?.filter((p) => (active === "All" ? true : p.category === active)) ?? [];
 
   return (
-    <main>
+    <>
       {/* ── Hero ─────────────────────────────────────────── */}
       <section className="container hero">
         <div className="hero-copy">
@@ -177,6 +177,6 @@ export function Home({ onOpenCart }: { onOpenCart: () => void }) {
           </div>
         )}
       </section>
-    </main>
+    </>
   );
 }

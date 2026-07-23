@@ -1,92 +1,99 @@
 # Kartly
 
-> # ⚠️ DO NOT DEPLOY THIS. LOCAL USE ONLY.
+> ## ⚠️ INTENTIONALLY VULNERABLE — EDUCATIONAL LAB
+> **This app ships 24 deliberately-planted security vulnerabilities. NEVER deploy a running instance to a public or live URL. Run it LOCALLY ONLY (`127.0.0.1`).**
 >
-> **Kartly is *intentionally* vulnerable software.** The `main` branch contains
-> real, exploitable security flaws on purpose. It is a teaching artifact for the
-> "build it → break it → fix it" AppSec series. Run it **only** on `localhost` or
-> an isolated VM. Never expose it to a network, never host it publicly, never put
-> real data in it. Every published port in `docker-compose.yml` is bound to
-> `127.0.0.1` for this reason.
+> Standing up a live copy would put an exploitable target on the internet. Like **OWASP Juice Shop, DVWA, and WebGoat**, the **source is meant to be read and published** — the prohibition is on **running a live exploitable instance**, *not* on sharing the code. Publish write-ups, fork it, star it; just don't host a running one.
 
-Kartly is a modern local marketplace — a realistic e-commerce app (catalog,
-cart/checkout, accounts, reviews, messaging, uploads, coupons, seller dashboard,
-admin back office) built on a production-grade TypeScript stack. It exists in two
-states:
-
-- **`main`** — the deliberately **vulnerable** build (all 24 vuln classes live).
-- **`fix/<slug>`** — one branch per vulnerability class, each secured correctly
-  and opened as a PR against `main`. **The PR diff is the lesson.** These branches
-  are never merged into `main` — merging one would remove the very bug it teaches.
-
-The full vulnerability index lives in [`VULNS.md`](./VULNS.md).
+Kartly is a polished, believable e‑commerce storefront — small‑batch makers, everyday goods — built as an **AppSec teaching lab**: *build web apps, break them, then fix them.* It looks and behaves like a real product, but `main` is riddled with the kinds of bugs real developers ship, each paired with a clean, production‑quality fix on its own branch.
 
 ---
 
-## Stack
+## The teaching model: `main` = vulnerable, `fix/*` = remediated
 
-| Layer | Choice |
-|-------|--------|
-| Language | TypeScript (strict), client + server |
-| Client | React + Vite (SPA) + self-hosted fonts |
-| Server | Node.js + Express |
-| DB | PostgreSQL + Prisma |
-| Docs | OpenAPI/Swagger at `/api/docs` |
-| Run | docker-compose (Postgres + app) |
+| Branch | What it is |
+|--------|------------|
+| **`main`** | Every one of the 24 vulnerabilities is **live**. This is the "before." |
+| **`fix/<slug>`** | One branch per vulnerability, cut from `main`, containing the **minimal** fix for exactly that class. Opened as a PR against `main` and **never merged** — merging one would delete the very bug it teaches. |
 
-## Run it (one command)
+**The diff between `main` and each `fix/<slug>` branch is the teaching artifact** — it shows exactly what the vulnerable code looked like and precisely what changed to remediate it. That's the "break it → fix it" content, one post per class.
 
-Requires Docker Desktop.
+- **The master index is [`VULNS.md`](./VULNS.md)** — every vulnerability with *Where · Vulnerable code · Exploit (exact payload) · Impact · Fix · Detect*.
+- **Proof, both directions:** exploit tests in `server/tests/exploits/` prove each bug is live on `main`; fixed tests in `server/tests/fixed/` reuse the **same attack code** and prove the bug is closed on its `fix/*` branch.
+- **Captured artifacts:** `artifacts/<class>/` holds each exploit receipt (`exploit.txt`), the remediation diff (`fix-diff.diff`), and a ready‑to‑file PR body (`PR.md`).
+
+The 24 classes cover the OWASP Top 10 plus the extended web classes (SSTI, XXE, path traversal, command injection, open redirect, mass assignment, JWT, CORS, business logic). Full matrix in [`VULNS.md`](./VULNS.md).
+
+---
+
+## Screenshots
+
+| Storefront | Product page | Cart |
+|---|---|---|
+| ![Kartly storefront](docs/screenshots/storefront.png) | ![Product detail](docs/screenshots/product.png) | ![Cart drawer](docs/screenshots/cart.png) |
+
+---
+
+## Run it (locally only)
+
+Requires Docker. **Every published port in `docker-compose.yml` is bound to `127.0.0.1`** — the stack is not reachable from your network, and it must stay that way. Do not change the binds to `0.0.0.0` and do not add deploy config.
 
 ```bash
-cp .env.example .env      # optional — compose has safe local defaults
+cp .env.example .env        # optional — compose has safe local defaults
 docker compose up --build
+# Storefront → http://localhost:4000
+# API docs   → http://localhost:4000/api/docs   (Swagger)
+# API health → http://localhost:4000/api/health
 ```
 
-Then open:
+The container migrates the schema, seeds a rich catalog + demo users, and serves the built SPA. `docker compose down -v` wipes the volumes for a clean slate.
 
-- Storefront → <http://localhost:4000>
-- API health → <http://localhost:4000/api/health>
-- API docs → <http://localhost:4000/api/docs>
+### Seeded logins (throwaway, local only)
 
-The container migrates the schema and seeds the database on first boot. Postgres
-data and uploads persist in named Docker volumes; `docker compose down -v` wipes
-them for a clean slate.
+| Role | Email | Password |
+|------|-------|----------|
+| Admin | `admin@kartly.test` | `admin1234` |
+| Seller | `seller@kartly.test` | `seller1234` |
+| Customer | `alice@kartly.test` | `alice1234` |
+| Customer | `bob@kartly.test` | `bob1234` |
+| Customer | `carol@kartly.test` | `carol1234` |
 
-### Seeded accounts (local demo only)
+> The dangerous classes (SSRF, RCE, file upload, XXE, LFI) are **sandboxed to the container** and only ever touch planted decoy files under `server/decoys/` — never real host secrets, cloud metadata, or outbound egress.
 
-| Email | Role | Password |
-|-------|------|----------|
-| `admin@kartly.test` | ADMIN | `admin1234` |
-| `seller@kartly.test` | SELLER | `seller1234` |
-| `alice@kartly.test` | CUSTOMER | `alice1234` |
-| `bob@kartly.test` | CUSTOMER | `bob1234` |
-| `carol@kartly.test` | CUSTOMER | `carol1234` |
+### Tests (both-outcomes)
 
-> These are throwaway credentials for a throwaway local app. Auth flows are wired
-> up in Phase 2.
+```bash
+npm run test        --workspace server   # exploit suite — passes on `main` (bugs live)
+npm run test:fixed  --workspace server   # fixed suite — fails on `main`, passes on each fix/* branch
+```
 
-## Local development (without Docker for the app)
+Both run black‑box HTTP against the running app (`KARTLY_URL`, default `http://localhost:4000`).
+
+### Local dev (without Docker for the app)
 
 ```bash
 npm install
 docker compose up -d db          # Postgres only
-npm run seed --workspace server  # after `prisma db push`
 npm run dev                      # client (5173) + server (4000)
 ```
 
-## Project layout
+---
+
+## Stack & layout
+
+Node/Express (layered routes → controllers → services → data), Prisma + PostgreSQL, JWT auth (access/refresh/reset), EJS server‑rendered surfaces, Zod validation, and a React + Vite storefront. TypeScript strict throughout; OpenAPI/Swagger at `/api/docs`.
 
 ```
 kartly/
-  docker-compose.yml   server/   client/   openapi.yaml   VULNS.md
+  server/    Express API + EJS views + Prisma + tests (exploits & fixed)
+  client/    React + Vite storefront
+  artifacts/ per-class exploit receipts, fix diffs, PR bodies
+  VULNS.md   the master vulnerability index
+  docker-compose.yml   localhost-only stack
 ```
 
-See the build spec (`../KARTLY_BUILD_SPEC.md`) for the full design.
+---
 
-## Safety rails
+## Intent
 
-Dangerous vuln classes (RCE, SSRF, file upload, XXE) are reachable for demos but
-sandboxed to the container and operate only against **planted decoy files**
-(`server/decoys/`) — never real host secrets or live cloud metadata. Details in
-`VULNS.md`.
+An educational security lab in the tradition of OWASP Juice Shop, DVWA, and WebGoat. Read it, learn from it, publish write‑ups from it — just **don't stand up a live exploitable instance.**

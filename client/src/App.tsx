@@ -19,19 +19,24 @@ export default function App() {
 
   return (
     <>
+      <a href="#main" className="skip-link">
+        Skip to content
+      </a>
       <Header onOpenCart={openCart} />
-      <Routes>
-        <Route path="/" element={<Home onOpenCart={openCart} />} />
-        <Route path="/product/:id" element={<ProductDetail onOpenCart={openCart} />} />
-        <Route path="/login" element={<Login />} />
-        <Route path="/register" element={<Register />} />
-        <Route path="/forgot-password" element={<ForgotPassword />} />
-        <Route path="/reset-password" element={<ResetPassword />} />
-        <Route path="/checkout" element={<Checkout />} />
-        <Route path="/account" element={<Account />} />
-        <Route path="/seller" element={<SellerDashboard />} />
-        <Route path="*" element={<Home onOpenCart={openCart} />} />
-      </Routes>
+      <main id="main" tabIndex={-1}>
+        <Routes>
+          <Route path="/" element={<Home onOpenCart={openCart} />} />
+          <Route path="/product/:id" element={<ProductDetail onOpenCart={openCart} />} />
+          <Route path="/login" element={<Login />} />
+          <Route path="/register" element={<Register />} />
+          <Route path="/forgot-password" element={<ForgotPassword />} />
+          <Route path="/reset-password" element={<ResetPassword />} />
+          <Route path="/checkout" element={<Checkout />} />
+          <Route path="/account" element={<Account />} />
+          <Route path="/seller" element={<SellerDashboard />} />
+          <Route path="*" element={<Home onOpenCart={openCart} />} />
+        </Routes>
+      </main>
       <Footer />
       <CartDrawer open={cartOpen} onClose={() => setCartOpen(false)} />
     </>

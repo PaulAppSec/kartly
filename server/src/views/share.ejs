@@ -9,11 +9,10 @@
 <body>
   <div class="wrap" style="max-width:680px;">
     <div class="brand"><span class="g">K</span> Kartly</div>
-    <%# VULNERABLE ON PURPOSE (main) — VULNS.md #9 (Reflected XSS): the search
-        term is emitted as raw HTML below, so ?q=(script) executes. The fix
-        switches back to contextual HTML escaping. %>
+    <%# FIX (fix/reflected-xss) — VULNS.md #9: the search term is now emitted
+        with contextual HTML escaping, so ?q=(script) is entity-encoded. %>
     <% if (q) { %>
-      <p class="muted" style="margin-top:16px;">Results for “<%- q %>”</p>
+      <p class="muted" style="margin-top:16px;">Results for “<%= q %>”</p>
     <% } %>
     <div class="card" style="margin-top:24px; overflow:hidden; padding:0;">
       <% if (product.imageUrl) { %>

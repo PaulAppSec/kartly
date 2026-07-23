@@ -39,12 +39,25 @@ export function createApp() {
     app.set("views", viewsDir);
   }
 
-  // ── Security posture. ⚠️ MISCONFIGURED ON PURPOSE (main) — Phase 3.
-  //    #20: the Content-Security-Policy is disabled, so the XSS/upload lessons
-  //    actually execute in a browser. The fix (fix/misconfig) restores a strict
-  //    CSP (and re-enables the other hardening).
+  // ── Security posture. FIX (fix/misconfig) — VULNS.md #20: restore a strict
+  //    Content-Security-Policy (defense-in-depth for the XSS/upload classes).
   app.disable("x-powered-by");
-  app.use(helmet({ contentSecurityPolicy: false }));
+  app.use(
+    helmet({
+      contentSecurityPolicy: {
+        directives: {
+          defaultSrc: ["'self'"],
+          scriptSrc: ["'self'"],
+          styleSrc: ["'self'", "'unsafe-inline'"],
+          imgSrc: ["'self'", "data:", "https:"],
+          fontSrc: ["'self'", "data:"],
+          connectSrc: ["'self'"],
+          objectSrc: ["'none'"],
+          frameAncestors: ["'self'"],
+        },
+      },
+    }),
+  );
 
   // ⚠️ MISCONFIGURED ON PURPOSE (main) — VULNS.md #23 (CORS). `origin:true`
   // reflects ANY request Origin and `credentials:true` allows cookies, so a
@@ -74,23 +87,8 @@ export function createApp() {
   // ── Live API docs
   app.use("/api/docs", swaggerUi.serve, swaggerUi.setup(loadOpenApi() as object));
 
-  // ⚠️ MISCONFIGURED ON PURPOSE (main) — VULNS.md #20 (Security misconfig). A
-  // debug endpoint dumps the full process environment (secrets included), a
-  // /.env route serves the config, and a debug error route surfaces raw stack
-  // traces. All removed by fix/misconfig.
-  app.get("/api/debug", (_req, res) => {
-    res.json({ node: process.version, uptime: process.uptime(), env: process.env });
-  });
-  app.get("/api/debug/error", () => {
-    throw new Error("boom: unhandled error — verbose stack leaked to the client");
-  });
-  app.get("/.env", (_req, res) => {
-    const dump = Object.entries(process.env)
-      .filter(([k]) => /JWT|SECRET|DATABASE|POSTGRES|TOKEN|PASSWORD/.test(k))
-      .map(([k, v]) => `${k}=${v}`)
-      .join("\n");
-    res.type("text/plain").send(dump);
-  });
+  // FIX (fix/misconfig) — VULNS.md #20: the debug /.env and /api/debug routes
+  // are removed (no secret/env/stack disclosure surface).
 
   // Unmatched API routes → JSON 404 (before the SPA fallback).
   app.use("/api", apiNotFound);

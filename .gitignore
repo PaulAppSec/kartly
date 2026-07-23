@@ -19,6 +19,9 @@ server/prisma/*.db
 uploads/*
 !uploads/.gitkeep
 
+# local email outbox written at runtime (nothing is actually sent)
+outbox/
+
 # logs & os cruft
 *.log
 npm-debug.log*

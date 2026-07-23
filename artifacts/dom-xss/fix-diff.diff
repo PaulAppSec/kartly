@@ -1,0 +1,23 @@
+diff --git a/server/src/views/share.ejs b/server/src/views/share.ejs
+index 7889b40..4bb59f9 100644
+--- a/server/src/views/share.ejs
++++ b/server/src/views/share.ejs
+@@ -50,14 +50,13 @@
+     <p class="muted" style="text-align:center; margin-top:20px;">Shared from Kartly — the modern local marketplace.</p>
+   </div>
+ 
+-  <%# ⚠️ VULNERABLE ON PURPOSE (main) — VULNS.md #10 (DOM XSS). A "personalized
+-      note" is read from the URL fragment and assigned via innerHTML, so
+-      #<img src=x onerror=alert(document.cookie)> runs in the victim's browser.
+-      Fix (fix/dom-xss) uses textContent (an inert sink). %>
++  <%# FIX (fix/dom-xss) — VULNS.md #10. The fragment note is written with
++      textContent (an inert sink), so a #<img onerror=...> fragment is shown as
++      literal text and never parsed as HTML. %>
+   <script>
+     (function () {
+       var note = decodeURIComponent((location.hash || "").slice(1));
+-      if (note) document.getElementById("kartly-share-note").innerHTML = note;
++      if (note) document.getElementById("kartly-share-note").textContent = note;
+     })();
+   </script>
+ </body>

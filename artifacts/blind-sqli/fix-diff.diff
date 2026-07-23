@@ -1,0 +1,24 @@
+diff --git a/server/src/data/productRepo.ts b/server/src/data/productRepo.ts
+index 7a77669..3939132 100644
+--- a/server/src/data/productRepo.ts
++++ b/server/src/data/productRepo.ts
+@@ -14,7 +14,18 @@ export const productRepo = {
+   // payload leaks data one bit at a time. Fix (fix/blind-sqli) allowlists
+   // the sort column.
+   search({ q, category, sort }: ProductQuery) {
+-    const orderBy = sort && sort.trim() !== "" ? sort : '"createdAt" DESC';
++    // FIX (fix/blind-sqli) — VULNS.md #3. The sort key is mapped through a fixed
++    // allowlist to a known-safe ORDER BY clause; arbitrary input (e.g.
++    // `(SELECT 1 FROM pg_sleep(3))`) falls back to the default and never reaches
++    // the query, so there is no injectable boolean/time oracle.
++    const SORTS: Record<string, string> = {
++      name: '"name" ASC',
++      "price-asc": '"price" ASC',
++      "price-desc": '"price" DESC',
++      newest: '"createdAt" DESC',
++      oldest: '"createdAt" ASC',
++    };
++    const orderBy = SORTS[sort ?? ""] ?? '"createdAt" DESC';
+     const sql = `SELECT * FROM "Product"
+                  WHERE (name ILIKE $1 OR description ILIKE $1)
+                    AND ($2::text IS NULL OR category = $2)

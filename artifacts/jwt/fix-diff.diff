@@ -1,0 +1,29 @@
+diff --git a/server/src/lib/jwt.ts b/server/src/lib/jwt.ts
+index aa66ffa..6855e90 100644
+--- a/server/src/lib/jwt.ts
++++ b/server/src/lib/jwt.ts
+@@ -33,18 +33,13 @@ export function signRefreshToken(claims: RefreshClaims): string {
+   });
+ }
+ 
+-// ⚠️ VULNERABLE ON PURPOSE (main) — VULNS.md #19 (JWT weaknesses). The verifier
+-// honours the token's OWN `alg` header and accepts `alg:none`, so an attacker
+-// forges an unsigned token (`{"alg":"none"}` + arbitrary claims) and becomes
+-// any user/role. The signing secret is also the weak, known default. The fix
+-// (fix/jwt) pins `algorithms:["HS256"]`, requires a strong secret, and checks
+-// expiry.
++// FIX (fix/jwt) — VULNS.md #19. Verify with a pinned algorithm list
++// (`["HS256"]`) and never trust the token's own `alg`, so `alg:none` and
++// algorithm-confusion tokens are rejected. `jwt.verify` also enforces the `exp`
++// claim. (In production the secret must be a strong random value, not the
++// weak default.)
+ export function verifyAccessToken(token: string): AccessClaims {
+-  const decoded = jwt.decode(token, { complete: true });
+-  if (decoded && (decoded.header as { alg?: string }).alg === "none") {
+-    return decoded.payload as AccessClaims; // trusts an unsigned token
+-  }
+-  return jwt.verify(token, env.jwtAccessSecret, { algorithms: [ALG, "none"] }) as AccessClaims;
++  return jwt.verify(token, env.jwtAccessSecret, { algorithms: [ALG] }) as AccessClaims;
+ }
+ 
+ export function verifyRefreshToken(token: string): RefreshClaims {

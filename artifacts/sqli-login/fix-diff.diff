@@ -1,0 +1,26 @@
+diff --git a/server/src/services/authService.ts b/server/src/services/authService.ts
+index 602ca10..e93d88a 100644
+--- a/server/src/services/authService.ts
++++ b/server/src/services/authService.ts
+@@ -62,12 +62,16 @@ export const authService = {
+   // Both the email and the plaintext password are concatenated into raw SQL, so
+   // `admin@kartly.test'-- ` comments out the password check and logs in as
+   // admin. Fix (fix/sqli-login) parameterizes and compares a hash.
++  // FIX (fix/sqli-login) — VULNS.md #2. Look the account up with a parameterized
++  // query (Prisma `findByEmail`) and compare the password in code, so the email
++  // field can never alter the SQL. `admin@kartly.test'-- ` is now just a
++  // (non-existent) email → 401. (Password is still compared as-is here; the
++  // hashing fix is the separate fix/auth branch.)
+   async login(input: LoginInput) {
+-    const rows = await prisma.$queryRawUnsafe<User[]>(
+-      `SELECT * FROM "User" WHERE email = '${input.email}' AND "passwordHash" = '${input.password}'`,
+-    );
+-    const user = rows[0];
+-    if (!user) throw new HttpError(401, "Incorrect email or password.");
++    const user = await userRepo.findByEmail(input.email);
++    if (!user || user.passwordHash !== input.password) {
++      throw new HttpError(401, "Incorrect email or password.");
++    }
+     return { user: toPublicUser(user), ...issueTokens(user) };
+   },
+ 

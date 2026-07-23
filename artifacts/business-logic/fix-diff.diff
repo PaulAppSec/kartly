@@ -1,0 +1,98 @@
+diff --git a/outbox/1784796779997-your-kartly-order-9f87516c-0653-4b07-ac4.html b/outbox/1784796779997-your-kartly-order-9f87516c-0653-4b07-ac4.html
+new file mode 100644
+index 0000000..04ba054
+--- /dev/null
++++ b/outbox/1784796779997-your-kartly-order-9f87516c-0653-4b07-ac4.html
+@@ -0,0 +1,31 @@
++<!doctype html>
++<html lang="en">
++<head><meta charset="utf-8" /><title>Your Kartly order 9f87516c-0653-4b07-ac4f-a15519810cdc</title></head>
++<body style="margin:0;background:#FAF8F4;font-family:Segoe UI,Roboto,Helvetica,Arial,sans-serif;color:#1A1712;">
++  <div style="max-width:560px;margin:0 auto;padding:32px 20px;">
++    <div style="font-weight:700;font-size:1.3rem;">
++      <span style="display:inline-block;background:#FF5A3C;color:#fff;border-radius:8px;padding:3px 8px;">K</span> Kartly
++    </div>
++    <div style="background:#fff;border:1px solid #ECE6DC;border-radius:16px;padding:28px;margin-top:20px;">
++      <h1 style="font-size:1.4rem;margin:0 0 6px;">Thanks for your order</h1>
++      <p style="color:#8A8175;margin:0 0 20px;">Order <strong>9f87516c-0653-4b07-ac4f-a15519810cdc</strong></p>
++      <table style="width:100%;border-collapse:collapse;">
++        
++          <tr>
++            <td style="padding:8px 0;border-bottom:1px solid #ECE6DC;">Stoneware Pour-Over Set × 1</td>
++            <td style="padding:8px 0;border-bottom:1px solid #ECE6DC;text-align:right;">$68.00</td>
++          </tr>
++        
++        <tr>
++          <td style="padding:12px 0;font-weight:700;">Total paid</td>
++          <td style="padding:12px 0;font-weight:700;text-align:right;font-size:1.2rem;">$68.00</td>
++        </tr>
++      </table>
++      <p style="margin:20px 0 0;">
++        <a href="http://localhost:4000/receipt/9f87516c-0653-4b07-ac4f-a15519810cdc" style="background:#FF5A3C;color:#fff;font-weight:700;text-decoration:none;padding:11px 20px;border-radius:999px;display:inline-block;">View your receipt</a>
++      </p>
++    </div>
++    <p style="color:#8A8175;font-size:.8rem;text-align:center;margin-top:16px;">Kartly · shop small · local demo</p>
++  </div>
++</body>
++</html>
+diff --git a/server/src/schemas/orderSchemas.ts b/server/src/schemas/orderSchemas.ts
+index f050a02..8a04928 100644
+--- a/server/src/schemas/orderSchemas.ts
++++ b/server/src/schemas/orderSchemas.ts
+@@ -1,16 +1,14 @@
+ import { z } from "zod";
+ 
+-// ⚠️ VULNERABLE ON PURPOSE (main) — VULNS.md #22 (Business logic). `qty` is no
+-// longer constrained to be positive, and the client may send `unitPrice`, which
+-// the checkout trusts. The fix (fix/business-logic) restores `min(1)` and drops
+-// client-supplied pricing (server prices from the DB).
++// FIX (fix/business-logic) — VULNS.md #22. `qty` must be a positive integer
++// again, and there is no client `unitPrice` field (unknown keys are stripped),
++// so the client can neither price the order nor go negative.
+ export const checkoutSchema = z.object({
+   items: z
+     .array(
+       z.object({
+         productId: z.string().min(1).max(80),
+-        qty: z.coerce.number().int().min(-1000).max(1000),
+-        unitPrice: z.coerce.number().optional(),
++        qty: z.coerce.number().int().min(1).max(100),
+       }),
+     )
+     .min(1, "Your cart is empty."),
+diff --git a/server/src/services/orderService.ts b/server/src/services/orderService.ts
+index 4b6340c..5a0d86f 100644
+--- a/server/src/services/orderService.ts
++++ b/server/src/services/orderService.ts
+@@ -48,11 +48,9 @@ export const orderService = {
+     return toDTO(order as OrderRow);
+   },
+ 
+-  // ⚠️ VULNERABLE ON PURPOSE (main) — VULNS.md #22 (Business logic). Checkout
+-  // now trusts the CLIENT-supplied `unitPrice` when present and allows negative
+-  // quantities, so a shopper sets their own price or drives the total negative.
+-  // The fix (fix/business-logic) prices every line from the DB and rejects
+-  // qty < 1. (The coupon path stays atomic/single-use here.)
++  // FIX (fix/business-logic) — VULNS.md #22. Every line is priced from the DB
++  // (client input is never trusted for price), stock is enforced, and qty is a
++  // positive integer (schema). The coupon path stays atomic/single-use.
+   async checkout(userId: string, input: CheckoutInput) {
+     if (input.addressId) {
+       const addr = await addressRepo.findById(input.addressId);
+@@ -68,11 +66,12 @@ export const orderService = {
+       const lineItems = input.items.map((item) => {
+         const product = byId.get(item.productId);
+         if (!product) throw new HttpError(400, `Unknown product: ${item.productId}`);
+-        // #22: client `unitPrice` is trusted when present; negative qty allowed.
+-        const unit = item.unitPrice !== undefined ? item.unitPrice : Number(product.price);
+-        const unitCents = Math.round(unit * 100);
++        if (product.stock < item.qty) {
++          throw new HttpError(409, `Not enough stock for “${product.name}”.`);
++        }
++        const unitCents = Math.round(Number(product.price) * 100);
+         subtotalCents += unitCents * item.qty;
+-        return { productId: product.id, qty: item.qty, unitPrice: unit };
++        return { productId: product.id, qty: item.qty, unitPrice: Number(product.price) };
+       });
+ 
+       let couponCode: string | null = null;

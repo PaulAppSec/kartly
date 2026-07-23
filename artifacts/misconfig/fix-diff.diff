@@ -1,0 +1,91 @@
+diff --git a/server/src/app.ts b/server/src/app.ts
+index dbeb6ee..f1d9087 100644
+--- a/server/src/app.ts
++++ b/server/src/app.ts
+@@ -39,12 +39,25 @@ export function createApp() {
+     app.set("views", viewsDir);
+   }
+ 
+-  // ── Security posture. ⚠️ MISCONFIGURED ON PURPOSE (main) — Phase 3.
+-  //    #20: the Content-Security-Policy is disabled, so the XSS/upload lessons
+-  //    actually execute in a browser. The fix (fix/misconfig) restores a strict
+-  //    CSP (and re-enables the other hardening).
++  // ── Security posture. FIX (fix/misconfig) — VULNS.md #20: restore a strict
++  //    Content-Security-Policy (defense-in-depth for the XSS/upload classes).
+   app.disable("x-powered-by");
+-  app.use(helmet({ contentSecurityPolicy: false }));
++  app.use(
++    helmet({
++      contentSecurityPolicy: {
++        directives: {
++          defaultSrc: ["'self'"],
++          scriptSrc: ["'self'"],
++          styleSrc: ["'self'", "'unsafe-inline'"],
++          imgSrc: ["'self'", "data:", "https:"],
++          fontSrc: ["'self'", "data:"],
++          connectSrc: ["'self'"],
++          objectSrc: ["'none'"],
++          frameAncestors: ["'self'"],
++        },
++      },
++    }),
++  );
+ 
+   // ⚠️ MISCONFIGURED ON PURPOSE (main) — VULNS.md #23 (CORS). `origin:true`
+   // reflects ANY request Origin and `credentials:true` allows cookies, so a
+@@ -74,23 +87,8 @@ export function createApp() {
+   // ── Live API docs
+   app.use("/api/docs", swaggerUi.serve, swaggerUi.setup(loadOpenApi() as object));
+ 
+-  // ⚠️ MISCONFIGURED ON PURPOSE (main) — VULNS.md #20 (Security misconfig). A
+-  // debug endpoint dumps the full process environment (secrets included), a
+-  // /.env route serves the config, and a debug error route surfaces raw stack
+-  // traces. All removed by fix/misconfig.
+-  app.get("/api/debug", (_req, res) => {
+-    res.json({ node: process.version, uptime: process.uptime(), env: process.env });
+-  });
+-  app.get("/api/debug/error", () => {
+-    throw new Error("boom: unhandled error — verbose stack leaked to the client");
+-  });
+-  app.get("/.env", (_req, res) => {
+-    const dump = Object.entries(process.env)
+-      .filter(([k]) => /JWT|SECRET|DATABASE|POSTGRES|TOKEN|PASSWORD/.test(k))
+-      .map(([k, v]) => `${k}=${v}`)
+-      .join("\n");
+-    res.type("text/plain").send(dump);
+-  });
++  // FIX (fix/misconfig) — VULNS.md #20: the debug /.env and /api/debug routes
++  // are removed (no secret/env/stack disclosure surface).
+ 
+   // Unmatched API routes → JSON 404 (before the SPA fallback).
+   app.use("/api", apiNotFound);
+diff --git a/server/src/middleware/errorHandler.ts b/server/src/middleware/errorHandler.ts
+index 99f6ac4..38c3e82 100644
+--- a/server/src/middleware/errorHandler.ts
++++ b/server/src/middleware/errorHandler.ts
+@@ -9,21 +9,16 @@ export class HttpError extends Error {
+   }
+ }
+ 
+-// ⚠️ MISCONFIGURED ON PURPOSE (main) — VULNS.md #20 (Security misconfig). The
+-// handler leaks the real error message AND the full stack trace to the client
+-// on 500s, disclosing internal paths, library versions, and query fragments.
+-// The fix (fix/misconfig) returns a generic message and logs server-side only.
++// FIX (fix/misconfig) — VULNS.md #20. Never leak internals: 500s are logged
++// server-side only and the client receives a generic message (no stack, no
++// error name).
+ export function errorHandler(err: unknown, _req: Request, res: Response, _next: NextFunction) {
+   const status = err instanceof HttpError ? err.status : 500;
++  const message = err instanceof HttpError ? err.message : "Something went wrong.";
+ 
+   if (status >= 500) {
+     console.error(err);
+-    const e = err as Error;
+-    return res.status(status).json({
+-      error: { message: e?.message ?? "Error", stack: e?.stack, name: e?.name },
+-    });
+   }
+ 
+-  const message = err instanceof HttpError ? err.message : "Something went wrong.";
+   res.status(status).json({ error: { message } });
+ }

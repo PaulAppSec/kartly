@@ -1,0 +1,48 @@
+diff --git a/server/src/controllers/adminApiController.ts b/server/src/controllers/adminApiController.ts
+index f97647d..07e2288 100644
+--- a/server/src/controllers/adminApiController.ts
++++ b/server/src/controllers/adminApiController.ts
+@@ -1,4 +1,4 @@
+-import { exec } from "node:child_process";
++import { execFile } from "node:child_process";
+ import { promisify } from "node:util";
+ import type { NextFunction, Request, Response } from "express";
+ import type { Role } from "@prisma/client";
+@@ -6,7 +6,7 @@ import { adminService } from "../services/adminService.js";
+ import { userRepo } from "../data/userRepo.js";
+ import { HttpError } from "../middleware/errorHandler.js";
+ 
+-const pexec = promisify(exec);
++const pexecFile = promisify(execFile);
+ 
+ // JSON admin API. ⚠️ VULNERABLE ON PURPOSE (main) — VULNS.md #6 (privilege
+ // escalation): the router is protected by requireAuth only, with NO role guard,
+@@ -41,22 +41,16 @@ export const adminApiController = {
+     }
+   },
+ 
+-  // ⚠️ VULNERABLE ON PURPOSE (main) — VULNS.md #15 (Command injection / RCE).
+-  // The "export report" tool builds a shell command by string-concatenating the
+-  // user-supplied label, so `label = "; cat …"` runs arbitrary commands.
+-  // Sandboxed per §7 — targets harmless bundled binaries and a decoy file; no
+-  // real secrets. The fix (fix/cmdi) uses execFile with an argument array (no
+-  // shell) and an allowlist.
++  // FIX (fix/cmdi) — VULNS.md #15. Run the report via execFile with an argument
++  // ARRAY and a fixed allowlisted binary — no shell is spawned, so the label is
++  // a single inert argument and metacharacters (`;`, `|`, `` ` ``) can't chain
++  // commands.
+   async exportReport(req: Request, res: Response, next: NextFunction) {
+     try {
+       const label = String(req.body?.label ?? "report").slice(0, 200);
+-      const cmd = `echo Kartly export ${label} && ls server/downloads | wc -l`;
+-      const { stdout } = await pexec(cmd);
++      const { stdout } = await pexecFile("echo", ["Kartly export:", label]);
+       res.json({ ok: true, output: stdout });
+-    } catch (err: unknown) {
+-      // Even a non-zero exit leaks captured stdout — surface it (verbose).
+-      const stdout = (err as { stdout?: string })?.stdout;
+-      if (stdout) return res.json({ ok: true, output: stdout });
++    } catch (err) {
+       next(err);
+     }
+   },

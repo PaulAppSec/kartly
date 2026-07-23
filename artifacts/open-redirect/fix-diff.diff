@@ -1,0 +1,27 @@
+diff --git a/server/src/controllers/pageController.ts b/server/src/controllers/pageController.ts
+index f4944fa..ebabc26 100644
+--- a/server/src/controllers/pageController.ts
++++ b/server/src/controllers/pageController.ts
+@@ -88,16 +88,15 @@ export const pageController = {
+     }
+   },
+ 
+-  // ⚠️ VULNERABLE ON PURPOSE (main) — VULNS.md #18 (Open redirect). When an
+-  // already-authenticated user hits /login?returnTo=…, they're bounced to the
+-  // target with NO validation, so `returnTo=//evil.com` or an absolute URL
+-  // sends them off-site (phishing / token-leaking landing). The fix
+-  // (fix/open-redirect) allows only same-origin relative paths. Anonymous users
+-  // fall through to the SPA login form.
++  // FIX (fix/open-redirect) — VULNS.md #18. Only follow same-origin RELATIVE
++  // paths: a single leading slash, no scheme, no protocol-relative `//`, no
++  // backslash. Anything external is ignored and the user falls through to the
++  // SPA login form.
+   loginRedirect(req: Request, res: Response, next: NextFunction) {
+     const returnTo = typeof req.query.returnTo === "string" ? req.query.returnTo : "";
+     const authenticated = Boolean(req.cookies?.[ACCESS_COOKIE]);
+-    if (returnTo && authenticated) {
++    const isRelative = returnTo.startsWith("/") && !returnTo.startsWith("//") && !returnTo.includes("\\");
++    if (returnTo && authenticated && isRelative) {
+       return res.redirect(returnTo);
+     }
+     next();

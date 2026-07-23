@@ -1,0 +1,62 @@
+diff --git a/server/src/schemas/authSchemas.ts b/server/src/schemas/authSchemas.ts
+index e24e194..df8ea9a 100644
+--- a/server/src/schemas/authSchemas.ts
++++ b/server/src/schemas/authSchemas.ts
+@@ -1,17 +1,13 @@
+ import { z } from "zod";
+ 
+-// Registration explicitly does NOT accept `role` — the field allowlist is the
+-// structural defense against mass assignment (#7). Phase 3 removes it on `main`.
+-// ⚠️ VULNERABLE (main) — `.passthrough()` lets unexpected fields (e.g. role)
+-// survive validation and reach the user-create spread (mass assignment #7).
+-// Fix (fix/mass-assignment) drops passthrough / uses an explicit pick.
+-export const registerSchema = z
+-  .object({
+-    email: z.string().email().max(200),
+-    password: z.string().min(8, "must be at least 8 characters").max(200),
+-    name: z.string().min(1).max(120),
+-  })
+-  .passthrough();
++// FIX (fix/mass-assignment) — VULNS.md #7. Dropping `.passthrough()` restores
++// Zod's default: unknown keys (e.g. an injected `role`) are STRIPPED during
++// parse, so only email/password/name survive to the user-create call.
++export const registerSchema = z.object({
++  email: z.string().email().max(200),
++  password: z.string().min(8, "must be at least 8 characters").max(200),
++  name: z.string().min(1).max(120),
++});
+ 
+ // ⚠️ VULNERABLE (main) — loose on purpose (§2: "Zod absent/loose on main").
+ // Not requiring a valid email format lets the SQLi payload (#2) through to the
+diff --git a/server/src/services/authService.ts b/server/src/services/authService.ts
+index 602ca10..e418c5d 100644
+--- a/server/src/services/authService.ts
++++ b/server/src/services/authService.ts
+@@ -1,4 +1,4 @@
+-import type { Prisma, User } from "@prisma/client";
++import type { User } from "@prisma/client";
+ import { prisma } from "../data/prisma.js";
+ import { userRepo } from "../data/userRepo.js";
+ import { env } from "../lib/env.js";
+@@ -48,13 +48,14 @@ export const authService = {
+     const existing = await userRepo.findByEmail(input.email);
+     if (existing) throw new HttpError(409, "An account with that email already exists.");
+ 
+-    // ⚠️ VULNERABLE (main) — VULNS.md #7 (mass assignment): the whole request
+-    // body is spread into the create, so `{"role":"ADMIN"}` self-promotes.
+-    // Also #4 (broken auth): password stored in PLAINTEXT.
+-    // Fix (fix/mass-assignment) whitelists fields; fix/auth hashes.
+-    const { email, name, password, ...rest } = input;
+-    const data = { ...rest, email, name, passwordHash: password as string };
+-    const user = await prisma.user.create({ data: data as Prisma.UserUncheckedCreateInput });
++    // FIX (fix/mass-assignment) — VULNS.md #7: construct the create from an
++    // EXPLICIT field allowlist; never spread the request body. An injected
++    // `role` (even if it reached here) cannot set a privileged column.
++    // (Password is still stored as-is here — hashing is the separate fix/auth.)
++    const { email, name, password } = input;
++    const user = await prisma.user.create({
++      data: { email, name, passwordHash: password },
++    });
+     return { user: toPublicUser(user), ...issueTokens(user) };
+   },
+ 

@@ -1,0 +1,51 @@
+diff --git a/server/src/services/sellerService.ts b/server/src/services/sellerService.ts
+index c683f42..228a487 100644
+--- a/server/src/services/sellerService.ts
++++ b/server/src/services/sellerService.ts
+@@ -2,7 +2,7 @@ import type { Role } from "@prisma/client";
+ import { productRepo } from "../data/productRepo.js";
+ import { HttpError } from "../middleware/errorHandler.js";
+ import { fetchUrlUnsafe } from "../lib/urlFetch.js";
+-import { saveRawBuffer, saveUnrestrictedUpload } from "../lib/upload.js";
++import { saveRawBuffer, saveValidatedImage } from "../lib/upload.js";
+ import { parseProductXmlUnsafe } from "../lib/xml.js";
+ import type { CreateProductInput, UpdateProductInput } from "../schemas/productSchemas.js";
+ import { toProductDTO } from "./productService.js";
+@@ -40,8 +40,8 @@ export const sellerService = {
+     file: Express.Multer.File | undefined,
+   ) {
+     await ownedProductOr404(productId, sellerId, role);
+-    // #13 unrestricted upload — no content validation, keeps client extension.
+-    const url = await saveUnrestrictedUpload(file);
++    // FIX (fix/upload) — VULNS.md #13: validate by magic bytes before saving.
++    const url = await saveValidatedImage(file);
+     return toProductDTO(await productRepo.update(productId, { imageUrl: url }));
+   },
+ 
+diff --git a/server/src/services/userService.ts b/server/src/services/userService.ts
+index d40a072..0696486 100644
+--- a/server/src/services/userService.ts
++++ b/server/src/services/userService.ts
+@@ -2,7 +2,7 @@ import { addressRepo } from "../data/addressRepo.js";
+ import { userRepo } from "../data/userRepo.js";
+ import { HttpError } from "../middleware/errorHandler.js";
+ import { fetchUrlUnsafe } from "../lib/urlFetch.js";
+-import { saveRawBuffer, saveUnrestrictedUpload } from "../lib/upload.js";
++import { saveRawBuffer, saveValidatedImage } from "../lib/upload.js";
+ import type { AddressInput, UpdateMeInput } from "../schemas/userSchemas.js";
+ import { toPublicUser } from "./authService.js";
+ 
+@@ -23,9 +23,11 @@ export const userService = {
+     return toPublicUser(user);
+   },
+ 
++  // FIX (fix/upload) — VULNS.md #13. saveValidatedImage verifies the file by
++  // magic bytes (not client MIME/extension), randomizes the name, and forces a
++  // safe extension, so a script .html is rejected (415).
+   async setAvatarFromUpload(userId: string, file: Express.Multer.File | undefined) {
+-    // #13 unrestricted upload.
+-    const url = await saveUnrestrictedUpload(file);
++    const url = await saveValidatedImage(file);
+     return toPublicUser(await userRepo.update(userId, { avatarUrl: url }));
+   },
+ 

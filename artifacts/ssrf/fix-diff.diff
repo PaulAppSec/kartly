@@ -1,0 +1,64 @@
+diff --git a/server/src/services/sellerService.ts b/server/src/services/sellerService.ts
+index c683f42..a07439d 100644
+--- a/server/src/services/sellerService.ts
++++ b/server/src/services/sellerService.ts
+@@ -1,8 +1,8 @@
+ import type { Role } from "@prisma/client";
+ import { productRepo } from "../data/productRepo.js";
+ import { HttpError } from "../middleware/errorHandler.js";
+-import { fetchUrlUnsafe } from "../lib/urlFetch.js";
+-import { saveRawBuffer, saveUnrestrictedUpload } from "../lib/upload.js";
++import { fetchRemoteImage } from "../lib/urlFetch.js";
++import { saveImageBuffer, saveUnrestrictedUpload } from "../lib/upload.js";
+ import { parseProductXmlUnsafe } from "../lib/xml.js";
+ import type { CreateProductInput, UpdateProductInput } from "../schemas/productSchemas.js";
+ import { toProductDTO } from "./productService.js";
+@@ -45,12 +45,12 @@ export const sellerService = {
+     return toProductDTO(await productRepo.update(productId, { imageUrl: url }));
+   },
+ 
++  // FIX (fix/ssrf) — VULNS.md #12: SSRF-safe fetch (allowlist scheme, block
++  // internal ranges, cap size/time, require an image) before saving.
+   async setImageFromUrl(sellerId: string, role: Role, productId: string, sourceUrl: string) {
+     await ownedProductOr404(productId, sellerId, role);
+-    // #12 SSRF — raw fetch of an attacker URL; the fetched bytes are persisted
+-    // and served back via /uploads, exposing internal responses.
+-    const { buffer } = await fetchUrlUnsafe(sourceUrl);
+-    const url = await saveRawBuffer(buffer);
++    const { buffer } = await fetchRemoteImage(sourceUrl);
++    const url = await saveImageBuffer(buffer);
+     return toProductDTO(await productRepo.update(productId, { imageUrl: url }));
+   },
+ 
+diff --git a/server/src/services/userService.ts b/server/src/services/userService.ts
+index d40a072..7446c29 100644
+--- a/server/src/services/userService.ts
++++ b/server/src/services/userService.ts
+@@ -1,8 +1,8 @@
+ import { addressRepo } from "../data/addressRepo.js";
+ import { userRepo } from "../data/userRepo.js";
+ import { HttpError } from "../middleware/errorHandler.js";
+-import { fetchUrlUnsafe } from "../lib/urlFetch.js";
+-import { saveRawBuffer, saveUnrestrictedUpload } from "../lib/upload.js";
++import { fetchRemoteImage } from "../lib/urlFetch.js";
++import { saveImageBuffer, saveUnrestrictedUpload } from "../lib/upload.js";
+ import type { AddressInput, UpdateMeInput } from "../schemas/userSchemas.js";
+ import { toPublicUser } from "./authService.js";
+ 
+@@ -29,10 +29,13 @@ export const userService = {
+     return toPublicUser(await userRepo.update(userId, { avatarUrl: url }));
+   },
+ 
++  // FIX (fix/ssrf) — VULNS.md #12. fetchRemoteImage allows only http/https,
++  // resolves the host and blocks private/loopback/link-local ranges, caps
++  // size/time, and requires an image content-type — so internal targets are
++  // refused (400) before any request is made.
+   async setAvatarFromUrl(userId: string, sourceUrl: string) {
+-    // #12 SSRF — raw fetch of a user-supplied URL, response persisted/served.
+-    const { buffer } = await fetchUrlUnsafe(sourceUrl);
+-    const url = await saveRawBuffer(buffer);
++    const { buffer } = await fetchRemoteImage(sourceUrl);
++    const url = await saveImageBuffer(buffer);
+     return toPublicUser(await userRepo.update(userId, { avatarUrl: url }));
+   },
+ 

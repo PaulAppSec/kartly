@@ -46,11 +46,10 @@ export function createApp() {
   app.disable("x-powered-by");
   app.use(helmet({ contentSecurityPolicy: false }));
 
-  // ⚠️ MISCONFIGURED ON PURPOSE (main) — VULNS.md #23 (CORS). `origin:true`
-  // reflects ANY request Origin and `credentials:true` allows cookies, so a
-  // malicious site can make authenticated cross-origin reads. The fix
-  // (fix/cors) restores a strict allowlist ([env.clientOrigin]).
-  app.use(cors({ origin: true, credentials: true }));
+  // FIX (fix/cors) — VULNS.md #23. Strict allowlist: only the configured client
+  // origin may send credentialed cross-origin requests; a foreign Origin is not
+  // reflected in Access-Control-Allow-Origin.
+  app.use(cors({ origin: [env.clientOrigin], credentials: true }));
   app.use(express.json({ limit: "1mb" }));
   app.use(express.urlencoded({ extended: true }));
   app.use(cookieParser());

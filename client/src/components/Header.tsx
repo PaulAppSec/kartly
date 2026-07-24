@@ -1,4 +1,5 @@
-import { Link } from "react-router-dom";
+import { useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { useCart } from "../context/CartContext";
 import { useTheme } from "../hooks/useTheme";
@@ -8,6 +9,14 @@ export function Header({ onOpenCart }: { onOpenCart: () => void }) {
   const { theme, toggle } = useTheme();
   const { user } = useAuth();
   const { count } = useCart();
+  const navigate = useNavigate();
+  const [q, setQ] = useState("");
+
+  const onSearch = (e: React.FormEvent) => {
+    e.preventDefault();
+    const term = q.trim();
+    if (term) navigate(`/search?q=${encodeURIComponent(term)}`);
+  };
 
   return (
     <header className="site-header">
@@ -24,9 +33,18 @@ export function Header({ onOpenCart }: { onOpenCart: () => void }) {
         </nav>
         <span className="header-spacer" />
         <div className="header-actions">
-          <button className="btn-icon" aria-label="Search products">
-            <Search />
-          </button>
+          <form className="header-search" role="search" onSubmit={onSearch}>
+            <span className="header-search-icon" aria-hidden="true">
+              <Search width={18} height={18} />
+            </span>
+            <input
+              type="search"
+              aria-label="Search products"
+              placeholder="Search products…"
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+            />
+          </form>
           <button
             className="btn-icon"
             aria-label={`Switch to ${theme === "light" ? "dark" : "light"} theme`}

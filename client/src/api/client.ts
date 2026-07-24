@@ -99,6 +99,14 @@ export const api = {
     return request<{ products: Product[] }>("GET", `/api/products${suffix}`);
   },
   getProduct: (id: string) => request<{ product: Product }>("GET", `/api/products/${id}`),
+  // Product search. Hits GET /api/search?q= (returns id/name/description/category).
+  // The term is URL-encoded in transit and decoded server-side — normal queries
+  // return matches; the server's raw-SQL search path is unchanged.
+  search: (q: string) =>
+    request<{ results: { id: string; name: string; description: string; category: string }[] }>(
+      "GET",
+      `/api/search?q=${encodeURIComponent(q)}`,
+    ),
   listReviews: (id: string) => request<{ reviews: Review[] }>("GET", `/api/products/${id}/reviews`),
   addReview: (id: string, body: string, rating: number) =>
     request<{ review: Review }>("POST", `/api/products/${id}/reviews`, { body, rating }),

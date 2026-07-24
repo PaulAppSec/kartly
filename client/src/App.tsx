@@ -10,6 +10,7 @@ import { Home } from "./pages/Home";
 import { Login } from "./pages/Login";
 import { ProductDetail } from "./pages/ProductDetail";
 import { Register } from "./pages/Register";
+import { Search } from "./pages/Search";
 import { ResetPassword } from "./pages/ResetPassword";
 import { SellerDashboard } from "./pages/SellerDashboard";
 
@@ -27,6 +28,7 @@ export default function App() {
         <Routes>
           <Route path="/" element={<Home onOpenCart={openCart} />} />
           <Route path="/product/:id" element={<ProductDetail onOpenCart={openCart} />} />
+          <Route path="/search" element={<Search />} />
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
           <Route path="/forgot-password" element={<ForgotPassword />} />

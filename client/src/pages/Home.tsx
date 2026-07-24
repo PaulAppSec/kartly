@@ -1,14 +1,16 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { api, type Product } from "../api/client";
 import { ProductCard, ProductCardSkeleton } from "../components/ProductCard";
 import { Arrow, Leaf, Shield, Truck } from "../components/Icons";
 import { money } from "../lib/format";
 
 export function Home({ onOpenCart }: { onOpenCart: () => void }) {
+  const [params] = useSearchParams();
   const [products, setProducts] = useState<Product[] | null>(null);
   const [error, setError] = useState(false);
-  const [active, setActive] = useState("All");
+  // Initial category filter can be deep-linked via ?category= (e.g. footer links).
+  const [active, setActive] = useState(params.get("category") ?? "All");
 
   useEffect(() => {
     let live = true;
